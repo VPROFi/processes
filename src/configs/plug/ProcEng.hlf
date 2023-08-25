@@ -1,0 +1,31 @@
+.Language=English,English
+.PluginContents=Panel for configuring network interfaces and routes
+
+@Contents
+$ #Panel Processes list#
+
+   ~Panel Processes list~@ProcessesPanel@
+   ~Configuration~@Config@
+
+@ProcessesPanel
+$^#Panel Processes list:#
+   The panel allows:
+
+  - view information, edit (#F4#) processes information
+
+@Config
+$^#Panel Processes: Configuration#
+   In this dialog, you can change the following options:
+
+  #Add to disc menu#
+    Allows adding "Processes plugin" to the disk menu.
+
+  #Add to plugins menu#
+    Allows adding "Processes plugin" items to the plug-in menu.
+
+  #Display logs#
+    Allows, prohibits the output of logs to a file (set file path).
+
+  #Save configuration to file#
+    Saves the configuration to a file ($HOME/.config/far2l/plugins/processes/config.ini), additionally allows you to manually fine-tune the columns (width, display names, etc.).
+

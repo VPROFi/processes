@@ -1,0 +1,143 @@
+#include "procpanel.h"
+#include "fardialog.h"
+#include "progress.h"
+#include <common/log.h>
+#include <common/utf8util.h>
+#include <utils.h>
+
+extern const char * LOG_FILE;
+#define LOG_SOURCE_FILE "procpanel.cpp"
+
+ProcPanel::ProcPanel(PanelIndex index_, std::unique_ptr<Processes> & processes_):
+	FarPanel(index_),
+	processes(processes_)
+{
+	LOG_INFO("\n");
+}
+
+ProcPanel::~ProcPanel()
+{
+	LOG_INFO("\n");
+}
+
+int ProcPanel::ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bool & change)
+{
+	LOG_INFO("\n");
+	if( controlState == PKF_CONTROL && key == VK_F4) {
+		LOG_INFO("PKF_CONTROL+VK_F4\n");
+		change = true;
+		Plugin::psi.Control(this, FCTL_SETSORTMODE, SM_NUMLINKS, 0);
+		return TRUE;
+	}
+
+	return IsPanelProcessKey(key, controlState);
+}
+
+int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber)
+{
+	LOG_INFO("\n");
+
+	*pItemsNumber = processes->procs.size();
+	*pPanelItem = (struct PluginPanelItem *)malloc((*pItemsNumber) * sizeof(PluginPanelItem));
+	memset(*pPanelItem, 0, (*pItemsNumber) * sizeof(PluginPanelItem));
+	PluginPanelItem * pi = *pPanelItem;
+
+	for( const auto & [pid, proc]: processes->procs ) {
+		pi->FindData.lpwszFileName = wcsdup(MB2Wide(proc->name.c_str()).c_str());
+		pi->FindData.dwFileAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
+
+		if( proc->flags & PF_KTHREAD )
+			pi->FindData.dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+
+		pi->FindData.nFileSize = ((uint64_t)proc->m_resident)*proc->pageSize;
+		pi->NumberOfLinks = (DWORD)(proc->percent_cpu * 100.0);
+
+		const wchar_t ** customColumnData = (const wchar_t **)malloc(ProcColumnMaxIndex*sizeof(const wchar_t *));
+		if( customColumnData ) {
+			memset(customColumnData, 0, ProcColumnMaxIndex*sizeof(const wchar_t *));
+			customColumnData[ProcColumnPidIndex] = DublicateCountString(proc->pid);
+			customColumnData[ProcColumnPriorityIndex] = DublicateCountString(proc->priority);
+			customColumnData[ProcColumnNiceIndex] = DublicateCountString(proc->nice);
+			customColumnData[ProcColumnCpuIndex] = DublicateFloatPercentString(proc->percent_cpu);
+			pi->CustomColumnNumber = ProcColumnMaxIndex;
+			pi->CustomColumnData = customColumnData;
+		}
+		pi++;
+	}
+	return int(true);
+}
+
+void ProcPanel::FreeFindData(struct PluginPanelItem * panelItem, int itemsNumber_)
+{
+	LOG_INFO("\n");
+	auto itemsNumber = itemsNumber_;
+	while( itemsNumber-- ) {
+		assert( (panelItem+itemsNumber)->FindData.dwFileAttributes & FILE_FLAG_DELETE_ON_CLOSE );
+		free((void *)(panelItem+itemsNumber)->FindData.lpwszFileName);
+	}
+	FarPanel::FreeFindData(panelItem, itemsNumber_);
+}
+
+int ProcPanel::ProcessEvent(int event, void *param)
+{
+	LOG_INFO("\n");
+	if( event != FE_IDLE )
+		return int(false);
+
+	processes->Update();
+
+	Plugin::psi.Control(this, FCTL_UPDATEPANEL, TRUE, 0);
+	Plugin::psi.Control(this, FCTL_REDRAWPANEL, 0, 0);
+
+	return int(true);	
+}
+
+void ProcPanel::GetOpenPluginInfo(struct OpenPluginInfo * info)
+{
+	FarPanel::GetOpenPluginInfo(info);
+	static wchar_t panelName[sizeof("Process list: 100000.00%       ")];
+	if( Plugin::FSF.snprintf(panelName, ARRAYSIZE(panelName), L"%S CPU(%.02f%%)", GetMsg(MPanelProcessTitle), processes->total_percent) > 0 )
+		info->PanelTitle = panelName;
+}
+
+int ProcPanel::DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, int opMode)
+{
+	LOG_INFO("\n");
+	if( itemsNumber == 1 && panelItem->FindData.lpwszFileName && Plugin::FSF.LStricmp(panelItem->FindData.lpwszFileName, L"..") == 0 )
+		return int(false);
+
+
+	PluginPanelItem * pi = panelItem;
+	auto _itemsNumber = itemsNumber;
+
+	std::vector<std::wstring> items;
+	std::vector<const wchar_t *> msg;
+	items.push_back(L"Kill processes: ");
+	msg.push_back(items.back().c_str());
+
+	while( _itemsNumber-- ) {
+		std::wstring m;
+		m += L"[";
+		m += pi->CustomColumnData[ProcColumnPidIndex];
+		m += L"] ";
+		m += pi->FindData.lpwszFileName;
+		items.push_back(m);
+		msg.push_back(items.back().c_str());
+		pi++;
+	}
+
+	if( Plugin::psi.Message(Plugin::psi.ModuleNumber, FMSG_MB_YESNO | FMSG_WARNING, nullptr, &msg.front(), msg.size(), 0) != 0)
+		return int(false);
+
+	pi = panelItem;
+	while( itemsNumber-- ) {
+		Process proc(Plugin::FSF.atoi(pi->CustomColumnData[ProcColumnPidIndex]));
+		proc.Kill();
+		pi++;
+	}
+
+	Plugin::psi.Control(this, FCTL_UPDATEPANEL, TRUE, 0);
+	Plugin::psi.Control(this, FCTL_REDRAWPANEL, 0, 0);
+
+	return int(true);
+}

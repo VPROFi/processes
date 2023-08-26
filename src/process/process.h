@@ -1,14 +1,6 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
-#ifndef _DEFAULT_SOURCE
-#define _DEFAULT_SOURCE
-#endif
-
-#ifndef _BSD_SOURCE
-#define _BSD_SOURCE
-#endif
-
 #include <string>
 #include <stdint.h>
 #include <sys/types.h>

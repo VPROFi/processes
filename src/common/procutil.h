@@ -5,6 +5,14 @@
 extern "C" {
 #endif
 
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE
+#endif
+
 #include <sys/types.h>
 
 char * GetFileData(const char * path, ssize_t *readed);

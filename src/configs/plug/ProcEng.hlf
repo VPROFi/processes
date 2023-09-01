@@ -11,7 +11,13 @@ $ #Panel Processes list#
 $^#Panel Processes list:#
    The panel allows:
 
-  - view information, edit (#F4#) processes information
+  - view and sort processes information
+    - #ctrl+F3# by name
+    - #ctrl+F4# by CPU usage
+    - #ctrl+F5# by PID
+    - #ctrl+F6# by resident memory usage
+    - #ctrl+F8# by time snice system start
+
 
 @Config
 $^#Panel Processes: Configuration#
@@ -29,3 +35,5 @@ $^#Panel Processes: Configuration#
   #Save configuration to file#
     Saves the configuration to a file ($HOME/.config/far2l/plugins/processes/config.ini), additionally allows you to manually fine-tune the columns (width, display names, etc.).
 
+ #Select panel fields#
+   Aviable <-> Selected. Use #SPACE# #ENTER# or mouse click.

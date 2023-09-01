@@ -448,7 +448,6 @@ void PluginCfg::FillFields(HANDLE hDlg, int listIndex, int index)
 		for( int i = 0; i < total; i++ ) {
 			LOG_INFO("cfg.columnTitles[%d][%d] %S\n", index, i, cfg.columnTitles[index][i]);
 		}*/
-
 }
 
 

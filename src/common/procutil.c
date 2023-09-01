@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <sys/time.h>
 
 #include <sys/stat.h>
 #include <dirent.h>
@@ -193,31 +194,31 @@ void GetCPUTimes(CPUTimes *ct)
 	ct->virtall = ct->guest + ct->guest_nice;
 	ct->total = ct->user + ct->nice + ct->systemall + ct->idleall + ct->steal + ct->virtall;
 
-//	if( prev_ct.user | prev_ct.system | prev_ct.idle ) {
-		// Since we do a subtraction (usertime - guest) and cputime64_to_clock_t()
-		// used in /proc/stat rounds down numbers, it can lead to a case where the
-		// integer overflow.
-		ct->user_period = saturatingSub(ct->user, prev_ct.user);
-		ct->nice_period = saturatingSub(ct->nice, prev_ct.nice);
-		ct->system_period = saturatingSub(ct->system, prev_ct.system);
-		ct->systemall_period = saturatingSub(ct->systemall, prev_ct.systemall);
-		ct->idleall_period = saturatingSub(ct->idleall, prev_ct.idleall);
-		ct->idle_period = saturatingSub(ct->idle, prev_ct.idle);
-		ct->iowait_period = saturatingSub(ct->iowait, prev_ct.iowait);
-		ct->irq_period = saturatingSub(ct->irq, prev_ct.irq);
-		ct->softirq_period = saturatingSub(ct->softirq, prev_ct.softirq);
-		ct->steal_period = saturatingSub(ct->steal, prev_ct.steal);
-		ct->guest_period = saturatingSub(ct->virtall, prev_ct.guest);
-		ct->total_period = saturatingSub(ct->total, prev_ct.total);
-		assert( ct->activeCPUs >= 1 );
-		ct->period = ((double)ct->total_period) / (double)ct->activeCPUs;
-//	}
+	// Since we do a subtraction (usertime - guest) and cputime64_to_clock_t()
+	// used in /proc/stat rounds down numbers, it can lead to a case where the
+	// integer overflow.
+	ct->user_period = saturatingSub(ct->user, prev_ct.user);
+	ct->nice_period = saturatingSub(ct->nice, prev_ct.nice);
+	ct->system_period = saturatingSub(ct->system, prev_ct.system);
+	ct->systemall_period = saturatingSub(ct->systemall, prev_ct.systemall);
+	ct->idleall_period = saturatingSub(ct->idleall, prev_ct.idleall);
+	ct->idle_period = saturatingSub(ct->idle, prev_ct.idle);
+	ct->iowait_period = saturatingSub(ct->iowait, prev_ct.iowait);
+	ct->irq_period = saturatingSub(ct->irq, prev_ct.irq);
+	ct->softirq_period = saturatingSub(ct->softirq, prev_ct.softirq);
+	ct->steal_period = saturatingSub(ct->steal, prev_ct.steal);
+	ct->guest_period = saturatingSub(ct->virtall, prev_ct.guest);
+	ct->total_period = saturatingSub(ct->total, prev_ct.total);
+	assert( ct->activeCPUs >= 1 );
+	ct->period = ((double)ct->total_period) / (double)ct->activeCPUs;
 
 	while( fgets(buffer, sizeof(buffer), file) ) {
-		if( memcmp(buffer, "procs_running", 3) != 0 ) {
-			ct->runningTasks = strtoul(buffer + strlen("procs_running"), NULL, 10);
+		if( memcmp(buffer, "btime", 5) == 0 )
+				sscanf(buffer, "btime %lld", &ct->btime);
+		else if( memcmp(buffer, "procs_running", 13) == 0 )
+				sscanf(buffer, "procs_running %d", &ct->runningTasks);
+		if( ct->btime && ct->runningTasks)
 			break;
-		}
 	}
 
 	fclose(file);
@@ -232,6 +233,7 @@ void GetCPUTimes(CPUTimes *ct)
 	LOG_INFO("steal            : %lld\n", ct->steal            );
 	LOG_INFO("guest            : %lld\n", ct->guest            );
 	LOG_INFO("guest_nice       : %lld\n", ct->guest_nice       );
+	LOG_INFO("btime            : %lld\n", ct->btime            );
 	LOG_INFO("user_period      : %lld\n", ct->user_period      );
 	LOG_INFO("nice_period      : %lld\n", ct->nice_period      );
 	LOG_INFO("system_period    : %lld\n", ct->system_period    );
@@ -252,7 +254,16 @@ void GetCPUTimes(CPUTimes *ct)
 	return;
 }
 
+uint64_t GetRealtimeMs(void)
+{
+	struct timeval tv;
+	if( gettimeofday(&tv, NULL) == 0 )
+		return ((uint64_t)tv.tv_sec * 1000) + ((uint64_t)tv.tv_usec / 1000);
+	return 0;
+}
+
 #ifdef MAIN_COMMON_PROCUTIL
+#include "sizestr.h"
 
 int main(int argc, char * argv[])
 {
@@ -268,6 +279,8 @@ int main(int argc, char * argv[])
 	LOG_INFO("activeCPUs: %d\n", GetActiveCPUs(0));
 	GetCPUTimes(&ct);
 
+	LOG_INFO("RealtimeMs: %llu\n", GetRealtimeMs());
+	LOG_INFO("RealtimeMs: %s\n", msec_to_str(GetRealtimeMs()));
 	return 0;
 }
 

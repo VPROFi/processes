@@ -14,6 +14,9 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <stdint.h>
+
+uint64_t GetRealtimeMs(void);
 
 char * GetFileData(const char * path, ssize_t *readed);
 void FreeFileData(char * buf);
@@ -32,6 +35,8 @@ typedef struct {
 	unsigned long long steal;
 	unsigned long long guest;
 	unsigned long long guest_nice;
+
+	unsigned long long btime;
 
 	unsigned long long idleall;
 	unsigned long long systemall;

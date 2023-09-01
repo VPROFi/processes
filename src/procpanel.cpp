@@ -3,6 +3,7 @@
 #include "progress.h"
 #include <common/log.h>
 #include <common/utf8util.h>
+#include <common/sizestr.h>
 #include <utils.h>
 
 extern const char * LOG_FILE;
@@ -24,14 +25,24 @@ int ProcPanel::ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bo
 {
 	LOG_INFO("\n");
 	if( controlState == PKF_CONTROL && key == VK_F4) {
-		LOG_INFO("PKF_CONTROL+VK_F4\n");
 		change = true;
 		Plugin::psi.Control(this, FCTL_SETSORTMODE, SM_NUMLINKS, 0);
 		return TRUE;
 	}
 
+	if( controlState == PKF_CONTROL && (key == VK_F5 || key == VK_F8)) {
+		//change = true;
+		return FALSE;
+	}
+
 	return IsPanelProcessKey(key, controlState);
 }
+
+#ifndef SET_FILETIME
+#define SET_FILETIME(ft, v64) \
+   (ft)->dwLowDateTime = (DWORD)v64; \
+   (ft)->dwHighDateTime = (DWORD)(v64 >> 32);
+#endif
 
 int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber)
 {
@@ -46,6 +57,9 @@ int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumbe
 		pi->FindData.lpwszFileName = wcsdup(MB2Wide(proc->name.c_str()).c_str());
 		pi->FindData.dwFileAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
 
+		SET_FILETIME(&pi->FindData.ftCreationTime, proc->startTimeMs);
+		SET_FILETIME(&pi->FindData.ftLastWriteTime, (uint64_t)proc->pid);
+
 		if( proc->flags & PF_KTHREAD )
 			pi->FindData.dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
 
@@ -59,6 +73,7 @@ int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumbe
 			customColumnData[ProcColumnPriorityIndex] = DublicateCountString(proc->priority);
 			customColumnData[ProcColumnNiceIndex] = DublicateCountString(proc->nice);
 			customColumnData[ProcColumnCpuIndex] = DublicateFloatPercentString(proc->percent_cpu);
+			customColumnData[ProcColumnTimeIndex] = wcsdup(MB2Wide(msec_to_str(GetRealtimeMs() - proc->startTimeMs)).c_str());
 			pi->CustomColumnNumber = ProcColumnMaxIndex;
 			pi->CustomColumnData = customColumnData;
 		}
@@ -131,7 +146,8 @@ int ProcPanel::DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, i
 
 	pi = panelItem;
 	while( itemsNumber-- ) {
-		Process proc(Plugin::FSF.atoi(pi->CustomColumnData[ProcColumnPidIndex]));
+		Process proc(pi->FindData.ftLastWriteTime.dwLowDateTime);
+		//Process proc(Plugin::FSF.atoi(pi->CustomColumnData[ProcColumnPidIndex]));
 		proc.Kill();
 		pi++;
 	}

@@ -95,6 +95,25 @@ void Processes::Log(void)
 }
 
 #ifdef MAIN_PROCESSES
+
+int RootExec(const char * cmd)
+{
+	std::string _cmd("sudo /bin/sh -c \'");
+	_cmd += cmd;
+	_cmd += "'";
+	LOG_INFO("Try exec \"%s\"\n", _cmd.c_str());
+	return system(_cmd.c_str());
+}
+
+int Exec(const char * cmd)
+{
+	std::string _cmd("/bin/sh -c \'");
+	_cmd += cmd;
+	_cmd += "'";
+	LOG_INFO("Try exec \"%s\"\n", _cmd.c_str());
+	return system(_cmd.c_str());
+}
+
 int main(int argc, char * argv[])
 {
 	Processes procs = Processes();

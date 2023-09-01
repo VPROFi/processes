@@ -45,18 +45,31 @@ std::map<PanelIndex, CfgDefaults> PluginCfg::def = {\
 		// nice                       C2
 		// cpu                        C3
 		// memory                     SF
-		{L"N,C0,C1,C2,C3,SF", L"N,C0,C1,C2,C3,SF"},
-		{L"0,8,3,5,6,10", L"0,8,3,5,6,10"},
-		{{L"module",L"pid",L"priority",L"nice",L"cpu",L"memory", 0}, {L"module",L"pid",L"priority",L"nice",L"cpu",L"memory",0}},
+		// time+                      C4
+		{L"N,C0,C1,C2,C3,SF", L"N,C0,C1,C2,C3,SF,C4"},
+		{L"0,8,3,5,6,10", L"0,8,3,5,6,10,35"},
+		{{L"module",L"pid",L"priority",L"nice",L"cpu",L"memory", 0}, {L"module",L"pid",L"priority",L"nice",L"cpu",L"memory",L"time+",0}},
 		{0,MEmptyString,0,0,MEmptyString,MEmptyString,MEmptyString,0,0,0,0,0},
 		{MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString},
-		{0,0,0,MF4CPUSort,0,0,0,0,0,0,0,0},
+		{0,0,0,MF4CPUSort,MF5PidSort,0,0,MF8TimeSort,0,0,0,0},
 		MPanelProcessTitle,
 		MFormatProcessPanel,
 		OPIF_USEFILTER|OPIF_USEHIGHLIGHTING|OPIF_SHOWPRESERVECASE|OPIF_ADDDOTS,
 		SM_NUMLINKS, 0
 		}},
 		};
+
+std::map<const std::wstring, CgfFields> PluginCfg::fields = {
+//         name         type        width           lngId
+	{L"module",   {{'N',0},     0,                0}},
+	{L"pid",      {{'C','0',0}, 5,                0}},
+	{L"priority", {{'C','1',0}, 3,                0}},
+	{L"nice",     {{'C','2',0}, 3,                0}},
+	{L"cpu",      {{'C','3',0}, 5,                0}},
+	{L"memory",   {{'S','F',0}, 10,               0}},
+	{L"time+",    {{'C','4',0}, 35,               0}}
+};
+
 
 bool PluginCfg::logEnable = true;
 bool PluginCfg::processAddToDisksMenu = false;
@@ -312,8 +325,17 @@ enum {
 	WinCfgConfigPrefixTextIndex,
 	WinCfgConfigPrefixEditIndex,
 	WinCfgConfigSaveSettingsCheckboxIndex,
+	WinCfgSeparator3Index,
+	WinCfgConfigWidePanelTextIndex,
+	WinCfgConfigFullscreenPanelTextIndex,
+	WinCfgConfigAviableWideFieldListBoxIndex,
+	WinCfgConfigSelectedWideFieldListBoxIndex,
+	WinCfgConfigAviableFullFieldListBoxIndex,
+	WinCfgConfigSelectedFullFieldListBoxIndex,
 	WinCfgMaxIndex
 };
+
+#define FIELDS_LIST_SIZE 5
 
 LONG_PTR WINAPI CfgDialogProc(HANDLE hDlg, int msg, int param1, LONG_PTR param2)
 {
@@ -326,8 +348,109 @@ LONG_PTR WINAPI CfgDialogProc(HANDLE hDlg, int msg, int param1, LONG_PTR param2)
 				WinCfgEanbleLogEditIndex);
 		}
 	}
+
+	if( (msg == DN_KEY && (param2 == KEY_ENTER || param2 == KEY_SPACE)) || (msg == DN_MOUSECLICK) ) {
+		switch( param1 ) {
+		case WinCfgConfigAviableWideFieldListBoxIndex:
+		case WinCfgConfigAviableFullFieldListBoxIndex:
+			{
+				FarListGetItem item = {(int)Plugin::psi.SendDlgMessage(hDlg,DM_LISTGETCURPOS,param1,0), 0};
+				if( Plugin::psi.SendDlgMessage(
+						hDlg,
+						DM_LISTGETITEM,
+						param1,
+						(LONG_PTR)&item) )
+					Plugin::psi.SendDlgMessage(
+							hDlg,
+							DM_LISTADDSTR,
+							param1+1,
+							(LONG_PTR)item.Item.Text);
+			}
+			break;
+		case WinCfgConfigSelectedWideFieldListBoxIndex:
+		case WinCfgConfigSelectedFullFieldListBoxIndex:
+			{
+				FarListDelete delitem = {(int)Plugin::psi.SendDlgMessage(hDlg,DM_LISTGETCURPOS,param1,0), 1};
+				Plugin::psi.SendDlgMessage(
+						hDlg,
+						DM_LISTDELETE,
+						param1,
+						(LONG_PTR)&delitem);
+			}
+			break;
+		};
+	}
+
+
+	if( msg == DN_KEY && param2 == KEY_TAB) {
+		switch( param1 ) {
+		case WinCfgConfigAviableWideFieldListBoxIndex:
+			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigSelectedWideFieldListBoxIndex,0);
+			return true;
+		case WinCfgConfigSelectedWideFieldListBoxIndex:
+			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigAviableFullFieldListBoxIndex,0);
+			return true;
+		case WinCfgConfigAviableFullFieldListBoxIndex:
+			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigSelectedFullFieldListBoxIndex,0);
+			return true;
+		};
+	}
+
 	return Plugin::psi.DefDlgProc(hDlg, msg, param1, param2);
 }
+
+void PluginCfg::FillFields(HANDLE hDlg, int listIndex, int index)
+{
+		auto & cfg = def[ProcessPanelIndex];
+		const int total = static_cast<int>(sizeof(cfg.columnTitles[0])/sizeof(cfg.columnTitles[0][0]));
+
+		assert( (size_t)index < sizeof(cfg.columnTitles)/sizeof(cfg.columnTitles[0]) );
+		assert( listIndex < WinCfgMaxIndex );
+
+		FarListGetItem li;
+		li.ItemIndex = 0;
+		std::wstring columnTypes;
+		std::wstring columnWidths;
+
+		while( Plugin::psi.SendDlgMessage(
+						hDlg,
+						DM_LISTGETITEM,
+						listIndex,
+						(LONG_PTR)&li) && \
+						total > li.ItemIndex ) {
+			LOG_INFO("%d. %S\n", li.ItemIndex, li.Item.Text);
+
+			auto f = fields.find(std::wstring(li.Item.Text));
+
+			if( f != fields.end() ) {
+				if( !columnTypes.empty() ) {
+					columnTypes += L",";
+					columnWidths += L",";
+				}
+				columnTypes += f->second.fieldType;
+				columnWidths += std::to_wstring(f->second.fieldWidth);
+
+				free((void *)cfg.columnTitles[index][li.ItemIndex]);
+				cfg.columnTitles[index][li.ItemIndex] = wcsdup(li.Item.Text);
+			}
+			li.ItemIndex++;
+		}
+
+		if( !columnTypes.empty() ) {
+				free((void *)cfg.columnTypes[index]);
+				cfg.columnTypes[index] = wcsdup(columnTypes.c_str());
+				free((void *)cfg.columnWidths[index]);
+				cfg.columnWidths[index] = wcsdup(columnWidths.c_str());
+		}
+
+		/*LOG_INFO("cfg.columnTypes[%d] %S\n", index, cfg.columnTypes[index]);
+		LOG_INFO("cfg.columnWidths[%d] %S\n", index, cfg.columnWidths[index]);
+		for( int i = 0; i < total; i++ ) {
+			LOG_INFO("cfg.columnTitles[%d][%d] %S\n", index, i, cfg.columnTitles[index][i]);
+		}*/
+
+}
+
 
 int PluginCfg::Configure(int itemNumber)
 {
@@ -343,12 +466,23 @@ int PluginCfg::Configure(int itemNumber)
 		/* Store */{DI_CHECKBOX, false,  80,  0, DIF_HIDDEN, {0}},
 		{DI_EDIT,     false, 21, DIALOG_WIDTH-6, 0, {0}},
 
-
 		{DI_TEXT,     true,   5,  0, 0, {0}},
 		{DI_TEXT,     true,   5,  0, 0, {.lngIdstring = ps_cfg_prefix}},
 		{DI_EDIT,     false, 14, 35/*DIALOG_WIDTH-6*/, 0, {0}},
 
 		{DI_CHECKBOX, false, 33,  0, 0, {.lngIdstring = MConfigSaveSettings}},
+
+		{DI_TEXT,     true,   5,  0, DIF_BOXCOLOR|DIF_SEPARATOR, {0}},
+
+		{DI_TEXT,     true,   12,  0, 0, {.ptrData = L"Wide panel:"}},
+		{DI_TEXT,     false,   39,  0, 0, {.ptrData = L"Full screen panel:"}},
+
+		{DI_LISTBOX,  true,   5,  20, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Aviable:"}},
+		{DI_LISTBOX,  false,  22, 35, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Selected:"}},
+
+		{DI_LISTBOX,  false,  37, 52, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Aviable:"}},
+		{DI_LISTBOX,  false,  54, 69, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Selected:"}},
+
 		{DI_ENDDIALOG, 0}
 	};
 
@@ -372,6 +506,51 @@ int PluginCfg::Configure(int itemNumber)
 	if( !logEnable )
 		fdc.OrFlags(WinCfgEanbleLogEditIndex, DIF_DISABLE);
 
+
+	std::vector<FarListItem> far_aviable_items;
+	far_aviable_items.resize(fields.size());
+	memset(&far_aviable_items.front(), 0, sizeof(FarListItem) * fields.size());
+	int i = 0;
+	for( auto & [name, cfg] : fields )
+		far_aviable_items[i++].Text = name.c_str();
+	far_aviable_items[0].Flags |= LIF_SELECTED;
+	FarList far_aviable_list = {(int)far_aviable_items.size(), &far_aviable_items.front()};
+
+	fdc.yEnd += FIELDS_LIST_SIZE;
+
+	FarDialogItem * item = fdc.GetDialogItem(WinCfgConfigAviableWideFieldListBoxIndex);
+	item->Y2 += FIELDS_LIST_SIZE;
+	item->ListItems = &far_aviable_list;
+	item = fdc.GetDialogItem(WinCfgConfigAviableFullFieldListBoxIndex);
+	item->ListItems = &far_aviable_list;
+	item->Y2 += FIELDS_LIST_SIZE;
+
+	std::vector<FarListItem> far_selected_wide_items;
+	auto & cfg = def[ProcessPanelIndex];
+	auto titles = cfg.columnTitles[0];
+	i = 0;
+	while( titles[i] ) {
+		FarListItem fli = {0, titles[i++], {0}};
+		far_selected_wide_items.push_back(fli);
+	}
+	FarList far_selected_wide_list = {(int)far_selected_wide_items.size(), &far_selected_wide_items.front()};
+	item = fdc.GetDialogItem(WinCfgConfigSelectedWideFieldListBoxIndex);
+	item->ListItems = &far_selected_wide_list;
+	item->Y2 += FIELDS_LIST_SIZE;
+	
+	std::vector<FarListItem> far_selected_full_items;
+	titles = cfg.columnTitles[1];
+	i = 0;
+	while( titles[i] ) {
+		FarListItem fli = {0, titles[i++], {0}};
+		far_selected_full_items.push_back(fli);
+	}
+	FarList far_selected_full_list = {(int)far_selected_full_items.size(), &far_selected_full_items.front()};
+	item = fdc.GetDialogItem(WinCfgConfigSelectedFullFieldListBoxIndex);
+	item->ListItems = &far_selected_full_list;
+	item->Y2 += FIELDS_LIST_SIZE;
+
+
 	auto offSuffix = fdc.AppendOkCancel();
 
 	fdc.SetDefaultButton(offSuffix + WinSuffixOkIndex);
@@ -388,6 +567,9 @@ int PluginCfg::Configure(int itemNumber)
 
 		if( !change )
 			return false;
+
+		FillFields(dlg.GetDlg(), WinCfgConfigSelectedWideFieldListBoxIndex, 0);
+		FillFields(dlg.GetDlg(), WinCfgConfigSelectedFullFieldListBoxIndex, 1);
 
 		for( auto & item : chlst ) {
 			switch(item.itemNum) {

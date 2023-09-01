@@ -31,7 +31,7 @@ char * Process::GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t 
 	return ::GetFileData(path, 0);
 }
 
-/*static unsigned long long AdjustTime(unsigned long long t)
+static uint64_t GetHZ(void)
 {
 	static int hz = 0;
 
@@ -41,9 +41,8 @@ char * Process::GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t 
 	if( !hz )
 		hz = 100;
 
-	return t * 100 / hz;
-}*/
-
+	return hz;
+}
 
 void Process::Update()
 {
@@ -122,8 +121,7 @@ void Process::Update()
 		}
 
 		lasttimes = utime + stime;
-
-		LOG_INFO("set lasttimes to %d\n", lasttimes);
+		startTimeMs = ct.btime*1000 + start_time*1000/GetHZ();
 
 		valid = true;
 
@@ -178,13 +176,14 @@ Process::Process(pid_t pid_, CPUTimes & ct_):
 	Update();
 };
 
-CPUTimes dummy_ct_;
+CPUTimes dummy_ct_ = {0};
 
 Process::Process(pid_t pid_):
 	pid(pid_),
 	ct(dummy_ct_)
 {
 	valid = false;
+	startTimeMs = 0;
 }
 
 Process::~Process()
@@ -202,6 +201,8 @@ void Process::Log(void) const
 	LOG_INFO("priority: %d, nice: %d\n", priority, nice);
 	LOG_INFO("pageSize: %d, pageSizeKB: %d\n", pageSize, pageSizeKB);
 	LOG_INFO("m_virt: %d, m_resident: %d\n", m_virt, m_resident);
+	if( startTimeMs )
+		LOG_INFO("start_time: %s\n", msec_to_str(GetRealtimeMs() - startTimeMs));
 }
 
 bool Process::Kill(void) const

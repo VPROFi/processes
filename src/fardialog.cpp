@@ -364,6 +364,9 @@ bool FarDialog::CreateChangeList(std::vector<ItemChange> & chlst)
 				chlst.push_back(std::move(ich));
 			}
 			break;
+		case DI_LISTBOX:
+			chlst.push_back(std::move(ich));
+			break;
 		}
 		itemNum++;
 	}

@@ -46,6 +46,7 @@ struct Process {
 	CPUTimes & ct;
 
 	unsigned long long lasttimes;
+	unsigned long long startTimeMs;
 
 	int pageSize;
 	int pageSizeKB;

@@ -43,10 +43,18 @@ typedef enum {
 	MaxPanelIndex
 } PanelIndex;
 
+typedef struct {
+	const wchar_t fieldType[sizeof("C100")];
+	uint32_t fieldWidth;
+	uint32_t lngId;
+} CgfFields;
+
 class PluginCfg : public FarApi {
 
 	private:
 		static std::map<PanelIndex, CfgDefaults> def;
+		static std::map<const std::wstring,CgfFields> fields;
+
 		static size_t init;
 
 		const char * GetPanelName(PanelIndex index) const;
@@ -56,6 +64,7 @@ class PluginCfg : public FarApi {
 		friend LONG_PTR WINAPI CfgDialogProc(HANDLE hDlg, int msg, int param1, LONG_PTR param2);
 
 		void SaveConfig(void) const;
+		void FillFields(HANDLE hDlg, int listIndex, int index);
 
 	public:
 		explicit PluginCfg();

@@ -9,6 +9,7 @@ enum {
 	ProcColumnPriorityIndex,
 	ProcColumnNiceIndex,
 	ProcColumnCpuIndex,
+	ProcColumnTimeIndex,
 	ProcColumnMaxIndex
 };
 

@@ -26,6 +26,8 @@ enum {
 	ps_cfg_prefix,
 
 	MF4CPUSort,
+	MF5PidSort,
+	MF8TimeSort,
 
 	MMaxString
 };

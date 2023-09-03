@@ -101,7 +101,7 @@ void PluginCfg::ReloadPanelKeyBar(struct PanelData * data, PanelIndex index)
 	}
 
 	constexpr static wchar_t * empty_string = const_cast<wchar_t *>(L"");
-	constexpr static wchar_t * defAltkeys[12] = {0,0,empty_string,empty_string,empty_string,empty_string,empty_string,0,0,empty_string,empty_string,empty_string};
+	constexpr static wchar_t * defAltkeys[12] = {0,0,empty_string,empty_string,empty_string,empty_string,empty_string,0,0,empty_string,0,0};
 	constexpr static wchar_t * defkeys[12] = {empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string,empty_string};
 	memmove(data->keyBar.AltTitles, defAltkeys, sizeof(defAltkeys));
 	memmove(data->keyBar.CtrlShiftTitles, defkeys, sizeof(defkeys));

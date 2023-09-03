@@ -381,21 +381,6 @@ LONG_PTR WINAPI CfgDialogProc(HANDLE hDlg, int msg, int param1, LONG_PTR param2)
 		};
 	}
 
-
-	if( msg == DN_KEY && param2 == KEY_TAB) {
-		switch( param1 ) {
-		case WinCfgConfigAviableWideFieldListBoxIndex:
-			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigSelectedWideFieldListBoxIndex,0);
-			return true;
-		case WinCfgConfigSelectedWideFieldListBoxIndex:
-			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigAviableFullFieldListBoxIndex,0);
-			return true;
-		case WinCfgConfigAviableFullFieldListBoxIndex:
-			Plugin::psi.SendDlgMessage(hDlg,DM_SETFOCUS,WinCfgConfigSelectedFullFieldListBoxIndex,0);
-			return true;
-		};
-	}
-
 	return Plugin::psi.DefDlgProc(hDlg, msg, param1, param2);
 }
 
@@ -476,11 +461,11 @@ int PluginCfg::Configure(int itemNumber)
 		{DI_TEXT,     true,   12,  0, 0, {.ptrData = L"Wide panel:"}},
 		{DI_TEXT,     false,   39,  0, 0, {.ptrData = L"Full screen panel:"}},
 
-		{DI_LISTBOX,  true,   5,  20, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Aviable:"}},
-		{DI_LISTBOX,  false,  22, 35, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Selected:"}},
+		{DI_LISTBOX,  true,   5,  20, DIF_LISTNOCLOSE, {.ptrData = L"Aviable:"}},
+		{DI_LISTBOX,  false,  22, 35, DIF_LISTNOCLOSE, {.ptrData = L"Selected:"}},
 
-		{DI_LISTBOX,  false,  37, 52, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Aviable:"}},
-		{DI_LISTBOX,  false,  54, 69, DIF_LISTWRAPMODE | DIF_LISTNOCLOSE | DIF_LISTNOAMPERSAND, {.ptrData = L"Selected:"}},
+		{DI_LISTBOX,  false,  37, 52, DIF_LISTNOCLOSE, {.ptrData = L"Aviable:"}},
+		{DI_LISTBOX,  false,  54, 69, DIF_LISTNOCLOSE, {.ptrData = L"Selected:"}},
 
 		{DI_ENDDIALOG, 0}
 	};
@@ -548,7 +533,6 @@ int PluginCfg::Configure(int itemNumber)
 	item = fdc.GetDialogItem(WinCfgConfigSelectedFullFieldListBoxIndex);
 	item->ListItems = &far_selected_full_list;
 	item->Y2 += FIELDS_LIST_SIZE;
-
 
 	auto offSuffix = fdc.AppendOkCancel();
 

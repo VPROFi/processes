@@ -16,3 +16,4 @@ If your want build inside other version far2l - put content ./src into ./far2l/p
 ![](img/1.png)
 ![](img/2.png)
 ![](img/3.png)
+![](img/4.png)

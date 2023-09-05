@@ -4,6 +4,8 @@
 #include <common/errname.h>
 #include <common/sizestr.h>
 
+#include <stdlib.h>
+
 #include <cstring>
 #include <memory>
 
@@ -28,7 +30,7 @@ char * Process::GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t 
 		return 0;
 	}
 
-	return ::GetFileData(path, 0);
+	return ::GetFileData(path, readed);
 }
 
 static uint64_t GetHZ(void)
@@ -139,7 +141,7 @@ void Process::Update()
 
 	LOG_INFO("buf: %s\n", buf);
 
-	/*int r = */ sscanf(buf, "%ld %ld %ld %ld %ld %ld %ld",
+	sscanf(buf, "%ld %ld %ld %ld %ld %ld %ld",
                   &m_virt,
                   &m_resident,
                   &m_share,
@@ -148,16 +150,132 @@ void Process::Update()
                   &m_drs,
                   &dummy2); /* unused since Linux 2.6; always 0 */
 
-	//if( r == 7 ) {
-		//m_virt *= pageSizeKB;
-		//m_resident *= pageSizeKB;
-	//}
-
 	FreeFileData(buf);
+
+	buf = GetFileData("/proc/%u/cmdline", pid, 0, 0);
+	// Maybe not enough permissions
+	if( buf ) {
+		cmdline = buf;
+		FreeFileData(buf);
+	}
 
 	Log();
 
 	return;
+}
+
+std::string Process::GetTempName(void) const
+{
+	char path[sizeof("/tmp/processXXXXXX")];
+	memmove(path, "/tmp/processXXXXXX", sizeof("/tmp/processXXXXXX"));
+	int f = mkstemp(&path[0]);
+	close(f);
+	return std::string(path);
+}
+
+char * Process::GetProcInfo(const char * info, ssize_t *readed) const
+{
+	std::string path(std::move(GetTempName()));
+	std::string cmd("cat ");
+	cmd += "/proc/";
+	cmd += std::to_string(pid) + "/";
+	cmd += info;
+	cmd += " >>";
+	cmd += path;
+	if( Exec(cmd.c_str()) ) {
+		if( RootExec(cmd.c_str()) ) {
+			cmd = "sudo " + cmd;
+			Exec(cmd.c_str());
+		}
+	}
+
+	LOG_INFO("get data from: %s\n", path.c_str());
+	auto buf = ::GetFileData(path.c_str(), readed);
+	LOG_INFO("unlink: %s\n", path.c_str());
+	unlink(path.c_str());
+	return buf;
+}
+
+std::string Process::CreateProcessInfo(void)
+{
+	std::string path(std::move(GetTempName()));
+	FILE* file = fopen(path.c_str(), "a");
+	if( !file ) {
+		LOG_ERROR("fopen(\"%s\", \"r\") ... error (%s)\n", path.c_str(), errorname(errno));
+		return std::string();
+	}
+
+	LOG_INFO("path: %s\n", path.c_str());
+
+	fprintf(file, "pid: %d\n", pid);
+	fprintf(file, "name: %s\n", name.c_str());
+
+	if( cmdline.empty() ) {
+		char * buf = GetProcInfo("cmdline", 0);
+		if( buf ) {
+			cmdline = buf;
+			FreeFileData(buf);
+		}
+	}
+
+	fprintf(file, "cmdline: %s\n", cmdline.c_str());
+	fprintf(file, "state: %c\n", state);
+	fprintf(file, "ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d\n", ppid, pgrp, session, tty, tpgid);
+	fprintf(file, "flags: 0x%08lX, min_flt: %ld, cmin_flt: %ld, maj_flt: %ld, cmaj_flt: %ld\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
+	fprintf(file, "utime %llu, stime %llu, cutime %llu, cstime %llu\n", utime, stime, cutime, cstime);
+	fprintf(file, "priority: %d, nice: %d\n", priority, nice);
+	fprintf(file, "virtual memory: %s\n", size_to_str((unsigned long long)m_virt*pageSize));
+	fprintf(file, "resident memory: %s\n", size_to_str((unsigned long long)m_resident*pageSize));
+	if( startTimeMs )
+		fprintf(file, "start_time: %s\n", msec_to_str(GetRealtimeMs() - startTimeMs));
+
+	ssize_t readed = 0;
+	char * buf = GetProcInfo("environ", &readed);
+
+	if( buf ) {
+		auto ptr = buf;
+		fprintf(file, "\nenviron: \n\n");
+		while( readed > 0 ) {
+			auto size = strlen(ptr)+1;
+			assert( readed >= size );
+			if( *ptr )
+				fprintf(file, "%s\n", ptr);
+			ptr += size;
+			readed -= size;
+		}
+		FreeFileData(buf);
+	}
+
+
+	readed = 0;
+	buf = GetProcInfo("maps", &readed);
+	if( buf ) {
+		auto ptr = buf;
+		ssize_t num = 0;
+		while( num < readed ) {
+			if( buf[num] == 0x0A )
+				buf[num] = 0;
+			num++;
+		}
+
+		fprintf(file, "\nmaps: \n\n");
+		while( readed > 0 ) {
+			auto size = strlen(ptr)+1;
+
+			assert( readed >= size );
+
+			if( size > 49 && (ptr[20] == 'x' || ptr[28] == 'x' || ptr[24] == 'x' || ptr[36] == 'x' || (size > 73 && ptr[73] == '[') || ptr[49] == '[' ) )
+				fprintf(file, "%s\n", ptr);
+			ptr += size;
+			readed -= size;
+		}
+
+		FreeFileData(buf);		
+	}
+
+	fclose(file);
+
+	return path;
 }
 
 Process::Process(pid_t pid_, CPUTimes & ct_):
@@ -194,6 +312,7 @@ Process::~Process()
 void Process::Log(void) const
 {
 	LOG_INFO("name: %s\n", name.c_str());
+	LOG_INFO("cmdline: %s\n", cmdline.c_str());
 	LOG_INFO("state: %c\n", state);
 	LOG_INFO("ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d\n", ppid, pgrp, session, tty, tpgid);
 	LOG_INFO("flags: 0x%08X, min_flt: %d, cmin_flt: %d, maj_flt: %d, cmaj_flt: %d\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
@@ -211,7 +330,6 @@ bool Process::Kill(void) const
 	if( (snprintf(buf.get(), MAX_CMD_LEN+1, "kill %d", pid)) < 0 )
 		return false;
 	return Exec(buf.get()) == 0 ? true:RootExec(buf.get()) == 0;
-	
 }
 
 #ifdef MAIN_PROCESS
@@ -244,6 +362,13 @@ int main(int argc, char * argv[])
 		proc.FreeFileData(proc.GetFileData("/proc/%u/stat", getpid(), 0, 0));
 	GetCPUTimes(&ct);
 	proc.Update();
+
+	proc.CreateProcessInfo();
+
+	Process proc2 = Process(1, ct);
+	proc2.Update();
+	auto path = proc2.CreateProcessInfo();
+
 	return 0;
 }
 #endif //MAIN_PROCESS

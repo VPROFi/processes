@@ -35,6 +35,25 @@ int ProcPanel::ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bo
 		return FALSE;
 	}
 
+	if( controlState == 0 && key == VK_F3) {
+
+		if( auto ppi = GetCurrentPanelItem() ) {
+			if( Plugin::FSF.LStricmp(ppi->FindData.lpwszFileName, L"..") != 0 ) {
+				CPUTimes ct = {0};
+				GetCPUTimes(&ct);
+				Process p((pid_t)ppi->FindData.ftLastWriteTime.dwLowDateTime, ct);
+				p.Update();
+				std::string path = p.CreateProcessInfo();
+				if( Plugin::psi.Editor(MB2Wide(path.c_str()).c_str(), ppi->FindData.lpwszFileName, 0, 0, -1, -1, EF_DISABLEHISTORY, 1, 1, CP_UTF8) == EEC_MODIFIED) {
+
+				}
+				unlink(path.c_str());
+			}
+			FreePanelItem(ppi);
+		}
+		return TRUE;
+	}
+
 	return IsPanelProcessKey(key, controlState);
 }
 

@@ -8,6 +8,7 @@
 #include <common/procutil.h>
 
 #include <assert.h>
+#include <vector>
 
 #ifndef MINIMUM
 #define MINIMUM(a, b)                  ((a) < (b) ? (a) : (b))
@@ -53,6 +54,8 @@ struct Process {
 
 
 	std::string name;
+	std::string cmdline;
+	std::vector<std::string> env;
 
 	float percent_cpu;
 
@@ -61,6 +64,15 @@ struct Process {
 
 	/* Resident set size (in kilobytes) */
 	long m_resident;
+
+
+
+	uint64_t bytesReceived;
+	uint64_t packetsReceived;
+	uint64_t bytesTransmitted;
+	uint64_t packetsTransmitted;
+
+
 
 	long m_share;
 	long m_trs;
@@ -196,8 +208,8 @@ struct Process {
 	    smap_Locked;           //    "     memory amount locked to RAM
 
 	char
-	    *environ,       // (special)       environment as string (/proc/#/environ)
-	    *cmdline,       // (special)       command line as string (/proc/#/cmdline)
+	    //*environ,       // (special)       environment as string (/proc/#/environ)
+	    //*cmdline,       // (special)       command line as string (/proc/#/cmdline)
 	    *cgroup,        // (special)       cgroup as string (/proc/#/cgroup)
 	    *cgname,        // (special)       name portion of above (if possible)
 	    *supgid,        // status          supplementary gids as comma delimited str
@@ -259,12 +271,17 @@ struct Process {
 	void Log(void) const;
 	void Update(void);
 	bool Kill(void) const;
-	void FreeFileData(char * buf) const;
+
+	std::string CreateProcessInfo(void);
+	std::string GetTempName(void) const;
+
 	char * GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t *readed) const;
+	void FreeFileData(char * buf) const;
 	explicit Process(pid_t pid, CPUTimes & ct);
 	explicit Process(pid_t pid);
 	~Process();
 protected:
+	char * GetProcInfo(const char * info, ssize_t *readed) const;
 };
 
 #endif // __PROCESS_H__

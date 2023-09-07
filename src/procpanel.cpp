@@ -43,11 +43,19 @@ int ProcPanel::ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bo
 				GetCPUTimes(&ct);
 				Process p((pid_t)ppi->FindData.ftLastWriteTime.dwLowDateTime, ct);
 				p.Update();
-				std::string path = p.CreateProcessInfo();
-				if( Plugin::psi.Editor(MB2Wide(path.c_str()).c_str(), ppi->FindData.lpwszFileName, 0, 0, -1, -1, EF_DISABLEHISTORY, 1, 1, CP_UTF8) == EEC_MODIFIED) {
-
+				if( p.valid ) {
+					std::string path = p.CreateProcessInfo();
+					if( Plugin::psi.Editor(MB2Wide(path.c_str()).c_str(), ppi->FindData.lpwszFileName, 0, 0, -1, -1, EF_DISABLEHISTORY, 1, 1, CP_UTF8) == EEC_MODIFIED) {
+					}
+					unlink(path.c_str());
+				} else {
+					std::wstring not_found;
+					not_found += L"[" + std::to_wstring(ppi->FindData.ftLastWriteTime.dwLowDateTime) + L"] ";
+					not_found += ppi->FindData.lpwszFileName;
+					not_found += L" ... not found";
+					const wchar_t* err_msg[] = {GetMsg(ps_title_short), not_found.c_str()};
+					Plugin::psi.Message(Plugin::psi.ModuleNumber, FMSG_WARNING | FMSG_MB_OK, nullptr, err_msg, sizeof(err_msg) / sizeof(err_msg[0]), 0);
 				}
-				unlink(path.c_str());
 			}
 			FreePanelItem(ppi);
 		}

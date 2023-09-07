@@ -16,7 +16,8 @@
 #define LOG_SOURCE_FILE "plugincfg.cpp"
 #define LOG_MAX_PATH 256
 
-static char initial_log[LOG_MAX_PATH] = {'/','t','m','p','/','f','a','r','2','l','.','p','r','o','c','e','s','s','.','l','o','g',0};
+//static char initial_log[LOG_MAX_PATH] = {'/','t','m','p','/','f','a','r','2','l','.','p','r','o','c','e','s','s','.','l','o','g',0};
+static char initial_log[LOG_MAX_PATH] = {'/','d','e','v','/','n','u','l','l',0};
 const char * LOG_FILE = initial_log;
 //static_assert( sizeof("/dev/null") < LOG_MAX_PATH );
 
@@ -169,7 +170,7 @@ PluginCfg::PluginCfg()
 
 		prefix = kfr.GetString("prefix", DEFAULT_PREFIX);
 
-		logEnable = (bool)kfr.GetInt("logEnable", true);
+		logEnable = (bool)kfr.GetInt("logEnable", false);
 	       	if( logEnable ) {
 			std::string logfile = kfr.GetString("logfile", initial_log);
 			if( logfile.size() < (LOG_MAX_PATH-1) && logfile.size() >= sizeof("/a") )
@@ -428,11 +429,6 @@ void PluginCfg::FillFields(HANDLE hDlg, int listIndex, int index)
 				cfg.columnWidths[index] = wcsdup(columnWidths.c_str());
 		}
 
-		/*LOG_INFO("cfg.columnTypes[%d] %S\n", index, cfg.columnTypes[index]);
-		LOG_INFO("cfg.columnWidths[%d] %S\n", index, cfg.columnWidths[index]);
-		for( int i = 0; i < total; i++ ) {
-			LOG_INFO("cfg.columnTitles[%d][%d] %S\n", index, i, cfg.columnTitles[index][i]);
-		}*/
 }
 
 

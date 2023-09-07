@@ -18,6 +18,9 @@ extern "C" {
 
 uint64_t GetRealtimeMs(void);
 
+int getlinksrc(const char * pathname, char * real, size_t size, char **rest);
+int GetFields(char * ln, const char * sep, char *** fr, int * eb, int en);
+
 char * GetFileData(const char * path, ssize_t *readed);
 void FreeFileData(char * buf);
 

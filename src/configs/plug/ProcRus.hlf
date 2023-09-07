@@ -1,8 +1,8 @@
 .Language=Russian,Russian (Русский)
-.PluginContents=Панель SQL
+.PluginContents=Панель Processes
 
 @Contents
-$ #Панель SQL
+$ #Панель Processes
 
    ~Панель Processes~@ProcessesPanel@
    ~Конфигурация~@Config@
@@ -17,6 +17,13 @@ $^#Панель Processes
     - #ctrl+F5# по PID
     - #ctrl+F6# по размеру резидентной памяти
     - #ctrl+F8# по времени работы (от запуска системы)
+
+  - детальный просмотр процесса #F3#
+    - командная строка
+    - переменные окружения
+    - сетевые сосединения
+    - загруженные модули
+    - открытые файлы и сокеты
 
 @Config
 $^#Панель SQL: Конфигурация#

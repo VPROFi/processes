@@ -18,6 +18,8 @@ struct Processes {
 
 	float total_percent;
 
+	bool UpdateTcpUdp(const char * path);
+	bool UpdateNet(void);
 	bool Update(void);
 	void Log(void);
 	Processes();

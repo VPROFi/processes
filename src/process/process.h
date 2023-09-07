@@ -66,7 +66,6 @@ struct Process {
 	long m_resident;
 
 
-
 	uint64_t bytesReceived;
 	uint64_t packetsReceived;
 	uint64_t bytesTransmitted;
@@ -277,11 +276,12 @@ struct Process {
 
 	char * GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t *readed) const;
 	void FreeFileData(char * buf) const;
-	explicit Process(pid_t pid, CPUTimes & ct);
+	explicit Process(pid_t pid_, CPUTimes & ct_);
 	explicit Process(pid_t pid);
 	~Process();
 protected:
 	char * GetProcInfo(const char * info, ssize_t *readed) const;
+	char * GetFilesInfo(ssize_t *readed) const;
 };
 
 #endif // __PROCESS_H__

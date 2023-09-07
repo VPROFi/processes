@@ -148,6 +148,97 @@ static inline unsigned long long saturatingSub(unsigned long long a, unsigned lo
 #define PROC_LINE_LENGTH 4096
 #endif
 
+/*
+ * GetFields() - separate a line into fields
+ */
+int GetFields(char * ln, const char * sep, char *** fr, int * eb, int en)
+{
+	char *bp, *cp;
+	const char *sp;
+	int i, j, n;
+	size_t len;
+	static char **fp = (char **)NULL;
+	static int nfpa = 0;
+
+	for (cp = ln, n = 0; cp && *cp;) {
+	    for (bp = cp; *bp && (*bp == ' ' || *bp == '\t'); bp++);
+		;
+	    if (!*bp || *bp == '\n')
+		break;
+	    for (cp = bp; *cp; cp++) {
+		if (*cp == '\n') {
+		    *cp = '\0';
+		    break;
+		}
+		if (*cp == '\t')	/* TAB is always a separator */
+		    break;
+		if (*cp == ' ')  {
+
+		/*
+		 * See if this field may have an embedded space.
+		 */
+		    if (!eb || !en)
+			break;
+		    else {
+			for (i = j = 0; i < en; i++) {
+			    if (eb[i] == n) {
+				j = 1;
+				break;
+			    }
+			}
+			if (!j)
+			    break;
+		    }
+		}
+		if (sep) {
+
+		/*
+		 * See if the character is in the separator list.
+		 */
+		    for (sp = sep; *sp; sp++) {
+			if (*sp == *cp)
+			    break;
+		    }
+		    if (*sp) {
+
+		    /*
+		     * See if this field may have an embedded separator.
+		     */
+			if (!eb || !en)
+			    break;
+			else {
+			    for (i = j = 0; i < en; i++) {
+				if (eb[i] == n) {
+				    j = 1;
+				    break;
+				}
+			    }
+			    if (!j)
+				break;
+			}
+		    }
+		}
+	    }
+	    if (*cp)
+		*cp++ = '\0';
+	    if (n >= nfpa) {
+		nfpa += 32;
+		len = (size_t)(nfpa * sizeof(char *));
+		if (fp)
+		    fp = (char **)realloc((void *)fp, len);
+		else
+		    fp = (char **)malloc(len);
+		if (!fp) {
+			LOG_ERROR("can't allocate " LLFMT " bytes\n", len);
+		    return -1;
+		}
+	    }
+	    fp[n++] = bp;
+	}
+	*fr = fp;
+	return(n);
+}
+
 void GetCPUTimes(CPUTimes *ct)
 {
 	char buffer[PROC_LINE_LENGTH + 1];
@@ -262,11 +353,39 @@ uint64_t GetRealtimeMs(void)
 	return 0;
 }
 
+//getlinksrc() - get the source path name for the /proc/<PID>/fd/<FD> link
+
+int getlinksrc(const char * pathname, char * real, size_t size, char **rest)
+{
+	char *cp;
+	int ll;
+	if (rest)
+	    *rest = (char *)NULL;
+
+	if( (ll = readlink(pathname, real, size - 1)) < 1 || ll >= size )
+	    return -1;
+
+	real[ll] = '\0';
+
+	if (*real == '/')
+	    return ll;
+
+	if( (cp = strchr(real, ':')) ) {
+	    *cp = '\0';
+		ll = strlen(real);
+	    if (rest)
+			*rest = cp + 1;
+	}
+	return ll;
+}
+
 #ifdef MAIN_COMMON_PROCUTIL
 #include "sizestr.h"
 
 int main(int argc, char * argv[])
 {
+	char real[256 + 1];
+	char *rest = 0;
 	CPUTimes ct = {0};
 	ssize_t readed;
 	char * buf = GetFileData("/proc/self/stat", &readed);
@@ -281,6 +400,10 @@ int main(int argc, char * argv[])
 
 	LOG_INFO("RealtimeMs: %llu\n", GetRealtimeMs());
 	LOG_INFO("RealtimeMs: %s\n", msec_to_str(GetRealtimeMs()));
+
+	if( getlinksrc("/proc/self/fd/1", real, sizeof(real)-1, &rest) > 0 )
+		LOG_INFO("/proc/self/fd/1 -> %s\n", real);
+
 	return 0;
 }
 

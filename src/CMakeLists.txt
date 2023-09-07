@@ -17,6 +17,7 @@ farapi.cpp
 progress.cpp
 procplugin.cpp
 procpanel.cpp
+process/sockets.cpp
 process/process.cpp
 process/processes.cpp
 common/errname.c

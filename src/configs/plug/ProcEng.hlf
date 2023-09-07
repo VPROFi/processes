@@ -1,5 +1,5 @@
 .Language=English,English
-.PluginContents=Panel for configuring network interfaces and routes
+.PluginContents=Panel Processes list
 
 @Contents
 $ #Panel Processes list#
@@ -18,6 +18,12 @@ $^#Panel Processes list:#
     - #ctrl+F6# by resident memory usage
     - #ctrl+F8# by time snice system start
 
+  - detailed view of process #F3#
+    - command line
+    - envinronment
+    - network connection
+    - loaded modules
+    - open files, pipes, sockets
 
 @Config
 $^#Panel Processes: Configuration#

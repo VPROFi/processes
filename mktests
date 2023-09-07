@@ -4,5 +4,6 @@ gcc -g -DMAIN_COMMON_LOG src/common/log.c -o tests/log
 gcc -g -DMAIN_COMMON_SIZESTR src/common/sizestr.c src/common/log.c -o tests/sizestr
 gcc -g -DMAIN_COMMON_ERRNAME src/common/errname.c src/common/log.c -o tests/errname
 gcc -g -DMAIN_COMMON_PROCUTIL src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c -o tests/procutil
-g++ -g -std=c++17 -DMAIN_PROCESS -Isrc -Wno-error=deprecated src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c src/process/process.cpp -o tests/process
-g++ -g -std=c++17 -DMAIN_PROCESSES -Isrc -Wno-error=deprecated src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c src/process/process.cpp src/process/processes.cpp -o tests/processes
+g++ -g -std=c++17 -DMAIN_PROCESS -Isrc -Wno-error=deprecated src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c src/process/sockets.cpp src/process/process.cpp -o tests/process
+g++ -g -std=c++17 -DMAIN_PROCESSES -Isrc -Wno-error=deprecated src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c src/process/sockets.cpp src/process/process.cpp src/process/processes.cpp -o tests/processes
+g++ -g -std=c++17 -DMAIN_SOCKETS -Isrc -Wno-error=deprecated src/common/procutil.c src/common/sizestr.c src/common/errname.c src/common/log.c src/process/sockets.cpp -o tests/sockets

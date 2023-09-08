@@ -164,11 +164,56 @@ void Process::Update()
 
 	FreeFileData(buf);
 
-	buf = GetFileData("/proc/%u/cmdline", pid, 0, 0);
+	ssize_t readed = 0;
+
+	buf = GetFileData("/proc/%u/cmdline", pid, 0, &readed);
 	// Maybe not enough permissions
 	if( buf ) {
+		/* Now process cmdline.
+		According to procfs man - it is a set of strings separated by null bytes:
+		      /proc/pid/cmdline
+              This  read-only file holds the complete command line for the process, unless the process is a zombie.  In the latter case, there is nothing in
+              this file: that is, a read on this file will return 0 characters.
+
+              For processes which are still running, the command-line arguments appear in this file in the same layout as they do in process memory: If  the
+              process is well-behaved, it is a set of strings separated by null bytes ('\0'), with a further null byte after the last string.
+
+              This  is  the  common case, but processes have the freedom to override the memory region and break assumptions about the contents or format of
+              the /proc/pid/cmdline file.
+              If, after an execve(2), the process modifies its argv strings, those changes will show up here.  This is not the same thing as  modifying  the
+              argv array.
+              Furthermore, a process may change the memory location that this file refers via prctl(2) operations such as PR_SET_MM_ARG_START.
+              Think of this file as the command line that the process wants you to see.
+		
+		*/
+		for (auto i = 0 ; i < readed; i++) 
+			if (buf[i] == '\0' ) buf[i] = ' ';
 		cmdline = buf;
+		LOG_INFO("cmdline: %s\n", cmdline.c_str());
+		LOG_INFO("name length: %ld\n", name.length());
 		FreeFileData(buf);
+		if ( name.length() == 15 && readed > 15 ) {
+			auto p1 = cmdline.rfind('/')+1;
+			auto p2 = cmdline.find(' ', p1);
+			/*LOG_INFO("cmdline find1 pos1: %ld pos2 %ld len %ld\n", p1, p2, p2-p1);
+			LOG_INFO("cmdline find1: %s\n", cmdline.substr(p1,p2-p1).c_str());
+			*/
+			if( cmdline.substr(p1,p2-p1).compare(0, 15, name)) {
+				auto p2 = cmdline.find(' ');
+				auto p1 = cmdline.rfind('/', p2)+1;
+				/*LOG_INFO("cmdline find2 pos1: %ld pos2 %ld len %ld\n", p1, p2, p2-p1);
+				LOG_INFO("cmdline find2: %s\n", cmdline.substr(p1,p2-p1).c_str());
+				*/
+				if( !cmdline.substr(p1,p2-p1).compare(0, 15, name)) {
+					name = cmdline.substr(p1,p2-p1);
+				}
+			}
+			else
+				name = cmdline.substr(p1,p2-p1);
+
+		}
+		LOG_INFO("name result: %s\n", name.c_str());
+
 	}
 
 	Log();

@@ -164,13 +164,6 @@ void Process::Update()
 
 	FreeFileData(buf);
 
-	buf = GetFileData("/proc/%u/cmdline", pid, 0, 0);
-	// Maybe not enough permissions
-	if( buf ) {
-		cmdline = buf;
-		FreeFileData(buf);
-	}
-
 	Log();
 
 	return;
@@ -250,15 +243,31 @@ std::string Process::CreateProcessInfo(void)
 	fprintf(file, "pid: %d\n", pid);
 	fprintf(file, "name: %s\n", name.c_str());
 
-	if( cmdline.empty() ) {
-		char * buf = GetProcInfo("cmdline", 0);
-		if( buf ) {
-			cmdline = buf;
-			FreeFileData(buf);
+
+	std::string cmdline;
+	std::string sockets;
+	std::string net;
+	std::string files;
+	std::string maps;
+
+	ssize_t readed = 0;
+	char * buf = GetProcInfo("cmdline", &readed);
+	if( buf ) {
+		auto ptr = buf;
+		while( readed > 0 ) {
+			auto size = strlen(ptr)+1;
+			assert( readed >= size );
+			if( *ptr ) {
+				cmdline += ' ';
+				cmdline += ptr;
+			}
+			ptr += size;
+			readed -= size;
 		}
+		FreeFileData(buf);
 	}
 
-	fprintf(file, "cmdline: %s\n", cmdline.c_str());
+	fprintf(file, "cmdline with arguments: %s\n", cmdline.c_str());
 	fprintf(file, "state: %c\n", state);
 	fprintf(file, "ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d\n", ppid, pgrp, session, tty, tpgid);
 	//fprintf(file, "flags: 0x%08lX, min_flt: %ld, cmin_flt: %ld, maj_flt: %ld, cmaj_flt: %ld\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
@@ -269,8 +278,7 @@ std::string Process::CreateProcessInfo(void)
 	if( startTimeMs )
 		fprintf(file, "start_time: %s\n", msec_to_str(GetRealtimeMs() - startTimeMs));
 
-	ssize_t readed = 0;
-	char * buf = GetProcInfo("environ", &readed);
+	buf = GetProcInfo("environ", &readed);
 
 	if( buf ) {
 		auto ptr = buf;
@@ -285,11 +293,6 @@ std::string Process::CreateProcessInfo(void)
 		}
 		FreeFileData(buf);
 	}
-
-	std::string sockets;
-	std::string net;
-	std::string files;
-	std::string maps;
 
 	readed = 0;
 	buf = GetProcInfo("maps", &readed);
@@ -432,7 +435,6 @@ Process::~Process()
 void Process::Log(void) const
 {
 	LOG_INFO("name: %s\n", name.c_str());
-	LOG_INFO("cmdline: %s\n", cmdline.c_str());
 	LOG_INFO("state: %c\n", state);
 	LOG_INFO("ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d\n", ppid, pgrp, session, tty, tpgid);
 	LOG_INFO("flags: 0x%08X, min_flt: %d, cmin_flt: %d, maj_flt: %d, cmaj_flt: %d\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
@@ -476,7 +478,6 @@ int main(int argc, char * argv[])
 {
 	CPUTimes ct = {0};
 	GetCPUTimes(&ct);
-
 	Process proc = Process(getpid(), ct);
 	proc.Log();
 	for(int i=0; i< 10000; i++)

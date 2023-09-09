@@ -33,7 +33,7 @@ class ProcPlugin : public Plugin {
 
 		// far2l api
 		HANDLE OpenFilePlugin(const wchar_t * name,const unsigned char * data, int dataSize, int opMode) override;
-		int GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber) override;
+		int GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber, int opMode) override;
 		HANDLE OpenPlugin(int openFrom, INT_PTR item) override;
 		void ClosePlugin(HANDLE hPlugin) override;
 };

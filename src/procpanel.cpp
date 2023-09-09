@@ -71,7 +71,7 @@ int ProcPanel::ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bo
    (ft)->dwHighDateTime = (DWORD)(v64 >> 32);
 #endif
 
-int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber)
+int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber, int opMode)
 {
 	LOG_INFO("\n");
 

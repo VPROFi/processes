@@ -117,10 +117,10 @@ SHAREDSYMBOL void WINAPI _export FreeFindDataW(HANDLE hPlugin,struct PluginPanel
 	return;
 }
 
-SHAREDSYMBOL int WINAPI _export GetFindDataW(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber,int OpMode)
+SHAREDSYMBOL int WINAPI _export GetFindDataW(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber,int opMode)
 {
-	LOG_INFO("hPlugin %p OpMode %d *pPanelItem %p *pItemsNumber %u\n", hPlugin, OpMode, *pPanelItem, *pItemsNumber);
-	gPlugin->GetFindData(hPlugin, pPanelItem, pItemsNumber);
+	LOG_INFO("hPlugin %p OpMode %d *pPanelItem %p *pItemsNumber %u\n", hPlugin, opMode, *pPanelItem, *pItemsNumber);
+	gPlugin->GetFindData(hPlugin, pPanelItem, pItemsNumber, opMode);
 	return TRUE;
 }
 
@@ -137,6 +137,12 @@ SHAREDSYMBOL HANDLE WINAPI _export OpenPluginW(int openFrom, INT_PTR item)
 	else
 		LOG_INFO("openFrom=%u, item=%u\n", openFrom, item);
 	return gPlugin->OpenPlugin(openFrom, item);
+}
+
+SHAREDSYMBOL int WINAPI _export SetFindListW(HANDLE hPlugin,const struct PluginPanelItem * panelItem,int itemsNumber)
+{
+	LOG_INFO("hPlugin %p panelItem %p itemsNumber %d\n", hPlugin, panelItem, itemsNumber);
+	return gPlugin->SetFindList(hPlugin, panelItem, itemsNumber);
 }
 
 SHAREDSYMBOL void WINAPI _export ClosePluginW(HANDLE hPlugin)

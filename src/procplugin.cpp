@@ -49,8 +49,8 @@ void ProcPlugin::ClosePlugin(HANDLE hPlugin)
 		}
 }
 
-int ProcPlugin::GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber)
+int ProcPlugin::GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber, int opMode)
 {
 	LOG_INFO("\n");
-	return static_cast<FarPanel *>(hPlugin)->GetFindData(pPanelItem, pItemsNumber);
+	return static_cast<FarPanel *>(hPlugin)->GetFindData(pPanelItem, pItemsNumber, opMode);
 }

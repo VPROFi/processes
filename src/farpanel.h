@@ -28,9 +28,10 @@ private:
 	std::unique_ptr<PanelData> data;
 public:
 	virtual int ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bool & change) = 0;
-	virtual int GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber) = 0;
+	virtual int GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber, int opMode) = 0;
 	virtual void GetOpenPluginInfo(struct OpenPluginInfo * info);
 	virtual void FreeFindData(struct PluginPanelItem * panelItem, int itemsNumber);
+	virtual int SetFindList(const struct PluginPanelItem *panelItem, int itemsNumber);
 	virtual int SetDirectory(const wchar_t *dir, int opMode);
 	virtual int DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, int opMode);
 	virtual int ProcessEvent(int event, void *param);

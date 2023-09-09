@@ -34,11 +34,12 @@ class Plugin {
 		virtual void ClosePlugin(HANDLE hPlugin) = 0;
 	
 		// far2l api
-		virtual int GetFindData(HANDLE hPlugin, struct PluginPanelItem **pPanelItem, int *pItemsNumber);
+		virtual int GetFindData(HANDLE hPlugin, struct PluginPanelItem **pPanelItem, int *pItemsNumber, int opMode);
 		virtual void FreeFindData(HANDLE hPlugin, struct PluginPanelItem * PanelItem, int ItemsNumber);
 		virtual void GetPluginInfo(struct PluginInfo *info);
 		virtual void GetOpenPluginInfo(HANDLE hPlugin, struct OpenPluginInfo *info);
 		virtual int SetDirectory(HANDLE hPlugin, const wchar_t *dir, int opMode);
+		virtual int SetFindList(HANDLE hPlugin, const struct PluginPanelItem *panelItem, int itemsNumber);
 		virtual int DeleteFiles(HANDLE hPlugin, struct PluginPanelItem *panelItem, int itemsNumber, int opMode);
 		virtual int ProcessKey(HANDLE hPlugin,int key,unsigned int controlState);
 		virtual int ProcessEvent(HANDLE hPlugin,int event,void *param);

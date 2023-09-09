@@ -43,6 +43,12 @@ const wchar_t * FarPanel::GetPanelTitle(void)
 	return data->openInfo.PanelTitle;
 }
 
+int FarPanel::SetFindList(const struct PluginPanelItem *panelItem, int itemsNumber)
+{
+	LOG_INFO("\n");
+	return int(false);
+}
+
 int FarPanel::SetDirectory(const wchar_t *dir, int opMode)
 {
 	LOG_INFO("\n");

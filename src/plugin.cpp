@@ -69,10 +69,10 @@ void Plugin::GetPluginInfo(struct PluginInfo *info)
 	cfg->GetPluginInfo(info);
 }
 
-int Plugin::GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber)
+int Plugin::GetFindData(HANDLE hPlugin,struct PluginPanelItem **pPanelItem,int *pItemsNumber, int opMode)
 {
 	LOG_INFO("\n");
-	return static_cast<FarPanel *>(hPlugin)->GetFindData(pPanelItem, pItemsNumber);
+	return static_cast<FarPanel *>(hPlugin)->GetFindData(pPanelItem, pItemsNumber, opMode);
 }
 
 void Plugin::FreeFindData(HANDLE hPlugin,struct PluginPanelItem * panelItem, int itemsNumber)
@@ -100,6 +100,12 @@ int Plugin::SetDirectory(HANDLE hPlugin, const wchar_t *dir, int opMode)
 {
 	LOG_INFO("\n");
 	return static_cast<FarPanel *>(hPlugin)->SetDirectory(dir, opMode);
+}
+
+int Plugin::SetFindList(HANDLE hPlugin, const struct PluginPanelItem *panelItem, int itemsNumber)
+{
+	LOG_INFO("\n");
+	return static_cast<FarPanel *>(hPlugin)->SetFindList(panelItem, itemsNumber);
 }
 
 int Plugin::DeleteFiles(HANDLE hPlugin, struct PluginPanelItem *panelItem, int itemsNumber, int opMode)

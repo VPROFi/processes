@@ -25,7 +25,7 @@ private:
 
 public:
 	int ProcessKey(HANDLE hPlugin, int key, unsigned int controlState, bool & change) override;
-	int GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber) override;
+	int GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumber, int opMode) override;
 	void FreeFindData(struct PluginPanelItem * panelItem, int itemsNumber) override;
 	int ProcessEvent(int event, void *param) override;
 	void GetOpenPluginInfo(struct OpenPluginInfo * info) override;

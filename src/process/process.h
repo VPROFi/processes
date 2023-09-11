@@ -38,17 +38,20 @@
 #define PF_KTHREAD 0x00200000
 #endif
 
-extern int RootExec(const char * cmd);
-extern int Exec(const char * cmd);
+extern int RootExec(const char * cmd, int flags = 0);
+extern int Exec(const char * cmd, int flags = 0);
 
 struct Process {
 
 	pid_t pid;
 	CPUTimes & ct;
 
+	bool valid;
+
 	std::string name;
 
-	bool valid;
+	std::string user;
+	std::string group;
 
 	unsigned long long lasttimes;
 	unsigned long long startTimeMs;
@@ -142,7 +145,7 @@ struct Process {
 	void Update(void);
 	bool Kill(void) const;
 
-	std::string CreateProcessInfo(void);
+	std::string CreateProcessInfo(const char * filePath = nullptr);
 	std::string GetTempName(void) const;
 
 	char * GetFileData(const char * fmt, pid_t _ppid, pid_t _tpid, ssize_t *readed) const;
@@ -153,6 +156,7 @@ struct Process {
 protected:
 	char * GetProcInfo(const char * info, ssize_t *readed) const;
 	char * GetFilesInfo(ssize_t *readed) const;
+	std::string GetProcInfoToString(const char * field, const char * separator);
 };
 
 #endif // __PROCESS_H__

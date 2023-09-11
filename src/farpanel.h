@@ -34,9 +34,11 @@ public:
 	virtual int SetFindList(const struct PluginPanelItem *panelItem, int itemsNumber);
 	virtual int SetDirectory(const wchar_t *dir, int opMode);
 	virtual int DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, int opMode);
+	virtual int GetFiles(struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode);
 	virtual int ProcessEvent(int event, void *param);
 
 	virtual bool Valid(void) { return index != NO_PANEL_INDEX; };
+	virtual void UdpatePanelInfo(void);
 
 	const wchar_t * GetPanelTitle(void);
 	const wchar_t * GetPanelTitleKey(int key, unsigned int controlState = 0) const;

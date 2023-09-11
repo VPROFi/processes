@@ -7,6 +7,7 @@
 #include <string>
 #include "lng.h"
 #include "farapi.h"
+#include <KeyFileHelper.h>
 
 enum {
 	PanelModeBrief,
@@ -65,6 +66,7 @@ class PluginCfg : public FarApi {
 
 		void SaveConfig(void) const;
 		void FillFields(HANDLE hDlg, int listIndex, int index);
+		void GetFieldsFromConfig(CfgDefaults & item, KeyFileReadHelper & kfrh, const char * name, int index, const char * prefix);
 
 	public:
 		explicit PluginCfg();

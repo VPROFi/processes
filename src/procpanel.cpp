@@ -93,6 +93,9 @@ int ProcPanel::GetFindData(struct PluginPanelItem **pPanelItem, int *pItemsNumbe
 		pi->FindData.nFileSize = ((uint64_t)proc->m_resident)*proc->pageSize;
 		pi->NumberOfLinks = (DWORD)(proc->percent_cpu * 100.0);
 
+		pi->Owner = wcsdup(MB2Wide(proc->user.c_str()).c_str());
+		pi->Group = wcsdup(MB2Wide(proc->group.c_str()).c_str());
+
 		const wchar_t ** customColumnData = (const wchar_t **)malloc(ProcColumnMaxIndex*sizeof(const wchar_t *));
 		if( customColumnData ) {
 			memset(customColumnData, 0, ProcColumnMaxIndex*sizeof(const wchar_t *));
@@ -182,5 +185,37 @@ int ProcPanel::DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, i
 	Plugin::psi.Control(this, FCTL_UPDATEPANEL, TRUE, 0);
 	Plugin::psi.Control(this, FCTL_REDRAWPANEL, 0, 0);
 
+	return int(true);
+}
+
+int ProcPanel::GetFiles(struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode)
+{
+	LOG_INFO("\n");
+	if( !(opMode & (OPM_FIND | OPM_SILENT | OPM_VIEW | OPM_QUICKVIEW) ) )
+		return int(false);
+
+	while( itemsNumber-- ) {
+		if( *destPath && !(panelItem->FindData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) ) {
+			LOG_INFO("panelItem->FindData.lpwszFileName %S *destPath: %S\n", panelItem->FindData.lpwszFileName, *destPath);
+			CPUTimes ct = {0};
+			GetCPUTimes(&ct);
+			Process p((pid_t)panelItem->FindData.ftLastWriteTime.dwLowDateTime, ct);
+			p.Update();
+			if( p.valid ) {
+				std::string path(Wide2MB(*destPath));
+				path += "/";
+				path += Wide2MB(panelItem->FindData.lpwszFileName);
+				p.CreateProcessInfo(path.c_str());
+			}
+		}
+		panelItem++;
+		destPath++;
+	}
+	return int(true);
+}
+
+int ProcPanel::SetDirectory(const wchar_t *dir, int opMode)
+{
+	LOG_INFO("\n");
 	return int(true);
 }

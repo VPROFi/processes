@@ -34,6 +34,8 @@ Plugin::Plugin(const PluginStartupInfo * info)
 
 	cfg = new PluginCfg();
 
+	config_change = false;
+
 	LOG_INFO("\n");
 }
 
@@ -53,13 +55,21 @@ Plugin::~Plugin()
 int Plugin::Configure(int itemNumber)
 {
 	assert( cfg != 0 );
-	return cfg->Configure(itemNumber);
+	config_change = cfg->Configure(itemNumber) != 0;
+	return int(config_change);
 }
 
 void Plugin::GetOpenPluginInfo(HANDLE hPlugin, struct OpenPluginInfo *info)
 {
 	LOG_INFO("GetOpenPluginInfo(hPlugin = %p)\n", hPlugin);
 	assert( hPlugin && hPlugin != INVALID_HANDLE_VALUE );
+
+	if( config_change ) {
+		config_change = false;
+		for( auto & item : panel )
+			item->UdpatePanelInfo();
+	}
+
 	static_cast<FarPanel *>(hPlugin)->GetOpenPluginInfo(info);
 }
 
@@ -112,6 +122,12 @@ int Plugin::DeleteFiles(HANDLE hPlugin, struct PluginPanelItem *panelItem, int i
 {
 	LOG_INFO("\n");
 	return static_cast<FarPanel *>(hPlugin)->DeleteFiles(panelItem, itemsNumber, opMode);
+}
+
+int Plugin::GetFiles(HANDLE hPlugin,struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode)
+{
+	LOG_INFO("\n");
+	return static_cast<FarPanel *>(hPlugin)->GetFiles(panelItem, itemsNumber, move, destPath, opMode);
 }
 
 int Plugin::ProcessEvent(HANDLE hPlugin,int event,void *param)

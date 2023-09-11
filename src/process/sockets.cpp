@@ -355,6 +355,7 @@ bool Sockets::UpdateUnix(void)
 		socks[inode] = s;
 	}
 
+	fclose(fs);
 	return true;
 }
 

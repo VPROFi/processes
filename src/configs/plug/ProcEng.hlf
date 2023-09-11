@@ -17,6 +17,7 @@ $^#Panel Processes list:#
     - #ctrl+F5# by PID
     - #ctrl+F6# by resident memory usage
     - #ctrl+F8# by time snice system start
+    - #ctrl+F11# by owner
 
   - detailed view of process #F3#
     - command line
@@ -24,6 +25,8 @@ $^#Panel Processes list:#
     - network connection
     - loaded modules
     - open files, pipes, sockets
+
+  - #alt+F7# search detailed view of process
 
 @Config
 $^#Panel Processes: Configuration#

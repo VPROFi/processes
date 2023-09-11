@@ -11,26 +11,26 @@ extern const char * LOG_FILE;
 static class ProcPlugin * gPlugin = 0;
 
 // export for processes
-int RootExec(const char * cmd)
+int RootExec(const char * cmd, int flags)
 {
 	assert( gPlugin != 0 );
 	if( !gPlugin )
 		return -1;
 	std::string _acmd(cmd);
 	std::wstring _cmd(_acmd.begin(), _acmd.end());
-	int res = gPlugin->FSF.Execute(_cmd.c_str(), EF_SUDO);
+	int res = gPlugin->FSF.Execute(_cmd.c_str(), flags | EF_SUDO);
 	LOG_INFO("exec \"%s\" return %d\n", cmd, res);
 	return res;
 }
 
-int Exec(const char * cmd)
+int Exec(const char * cmd, int flags)
 {
 	assert( gPlugin != 0 );
 	if( !gPlugin )
 		return -1;
 	std::string _acmd(cmd);
 	std::wstring _cmd(_acmd.begin(), _acmd.end());
-	int res = gPlugin->FSF.Execute(_cmd.c_str(), 0);
+	int res = gPlugin->FSF.Execute(_cmd.c_str(), flags);
 	LOG_INFO("exec \"%s\" return %d\n", cmd, res);
 	return res;
 }
@@ -143,6 +143,15 @@ SHAREDSYMBOL int WINAPI _export SetFindListW(HANDLE hPlugin,const struct PluginP
 {
 	LOG_INFO("hPlugin %p panelItem %p itemsNumber %d\n", hPlugin, panelItem, itemsNumber);
 	return gPlugin->SetFindList(hPlugin, panelItem, itemsNumber);
+}
+
+// This function is called only for plugins that implement virtual file systems. 
+// For this it is necessary to remove the OPIF_REALNAMES flag when GetOpenPluginInfo is called, 
+// otherwise this function will never be called.
+SHAREDSYMBOL int WINAPI _export GetFilesW(HANDLE hPlugin,struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode)
+{
+	LOG_INFO("hPlugin %p panelItem %p itemsNumber %d move %d destPath %p opMode %d\n", hPlugin, panelItem, itemsNumber, move, destPath, opMode);
+	return gPlugin->GetFiles(hPlugin, panelItem, itemsNumber, move, destPath, opMode);
 }
 
 SHAREDSYMBOL void WINAPI _export ClosePluginW(HANDLE hPlugin)

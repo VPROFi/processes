@@ -9,7 +9,6 @@
 
 
 #include <utils.h>
-#include <KeyFileHelper.h>
 
 #include <common/log.h>
 
@@ -47,9 +46,10 @@ std::map<PanelIndex, CfgDefaults> PluginCfg::def = {\
 		// cpu                        C3
 		// memory                     SF
 		// time+                      C4
-		{L"N,C0,C1,C2,C3,SF", L"N,C0,C1,C2,C3,SF,C4"},
-		{L"0,8,3,5,6,10", L"0,8,3,5,6,10,35"},
-		{{L"module",L"pid",L"priority",L"nice",L"cpu",L"memory", 0}, {L"module",L"pid",L"priority",L"nice",L"cpu",L"memory",L"time+",0}},
+		// owner                      O
+		{L"N,C0,C1,C2,C3,SF", L"N,C0,C1,C2,C3,SF,C4,O,U"},
+		{L"0,8,3,5,6,10", L"0,8,3,5,6,10,35,10,10"},
+		{{L"module",L"pid",L"priority",L"nice",L"cpu",L"memory", 0}, {L"module",L"pid",L"priority",L"nice",L"cpu",L"memory",L"time+",L"owner",L"group",0}},
 		{0,MEmptyString,0,0,MEmptyString,MEmptyString,MEmptyString,0,0,0,0,0},
 		{MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString,MEmptyString},
 		{0,0,0,MF4CPUSort,MF5PidSort,0,0,MF8TimeSort,0,0,0,0},
@@ -68,7 +68,9 @@ std::map<const std::wstring, CgfFields> PluginCfg::fields = {
 	{L"nice",     {{'C','2',0}, 3,                0}},
 	{L"cpu",      {{'C','3',0}, 5,                0}},
 	{L"memory",   {{'S','F',0}, 10,               0}},
-	{L"time+",    {{'C','4',0}, 35,               0}}
+	{L"time+",    {{'C','4',0}, 35,               0}},
+	{L"owner",    {{'O',0},     10,               0}},
+	{L"group",    {{'U',0},     10,               0}}
 };
 
 
@@ -153,6 +155,30 @@ void PluginCfg::FillPanelData(struct PanelData * data, PanelIndex index)
 	ReloadPanelString(data, index);
 }
 
+void PluginCfg::GetFieldsFromConfig(CfgDefaults & item, KeyFileReadHelper & kfrh, const char * name, int index, const char * prefix)
+{
+	std::string field_prefix(prefix);
+	for( size_t i = 0; i < ARRAYSIZE(item.columnTitles[0]); i++ ) {
+			std::string field = field_prefix + std::to_string(i);
+			std::wstring iniTitle = kfrh.GetString(name, field.c_str(), L"");
+			if( !iniTitle.empty() )
+				item.columnTitles[index][i] = wcsdup(iniTitle.c_str());
+			else {
+				if( i != 0 )
+					item.columnTitles[index][i] = 0;
+				else {
+					// no config: fill default values
+					for( size_t j = 0; j < ARRAYSIZE(item.columnTitles[0]); j++ )
+						if( item.columnTitles[index][j] )
+							item.columnTitles[index][j] = wcsdup(item.columnTitles[index][j]);
+						else
+							break;
+					break;
+				}
+			}
+	}
+}
+
 PluginCfg::PluginCfg()
 {
 	LOG_INFO("init %d\n", init);
@@ -192,31 +218,17 @@ PluginCfg::PluginCfg()
 		item.columnWidths[0] = wcsdup(kfrh.GetString(name, "columnWidths4", item.columnWidths[0]).c_str());
 		item.columnWidths[1] = wcsdup(kfrh.GetString(name, "columnWidths5", item.columnWidths[1]).c_str());
 
-		std::string field_prefix("title4_");
-		uint32_t offset = 0;
-		for( auto & title: item.columnTitles[0] ) {
-			if( title ) {
-				std::string field = field_prefix + std::to_string(offset);
-				title = wcsdup(kfrh.GetString(name, field.c_str(), title).c_str());
-			}
-			offset++;
-		}
-
-		field_prefix = "title5_";
-		offset = 0;
-		for( auto & title: item.columnTitles[1] ) {
-			if( title ) {
-				std::string field = field_prefix + std::to_string(offset);
-				title = wcsdup(kfrh.GetString(name, field.c_str(), title).c_str());
-			}
-			offset++;
-		}
+		GetFieldsFromConfig(item, kfrh, name, 0, "title4_");
+		GetFieldsFromConfig(item, kfrh, name, 1, "title5_");
 	}
 }
 
 void PluginCfg::SaveConfig(void) const
 {
 	LOG_INFO("=== Save config ===\n");
+
+	auto path = INI_LOCATION;
+	unlink(INI_LOCATION.c_str());
 
 	KeyFileHelper kfh(INI_LOCATION);
 	for( auto & [index, item] : def ) {
@@ -241,9 +253,13 @@ void PluginCfg::SaveConfig(void) const
 		field_prefix = "title5_";
 		offset = 0;
 		for( auto & title: item.columnTitles[1] ) {
+			std::string field = field_prefix + std::to_string(offset);
 			if( title ) {
-				std::string field = field_prefix + std::to_string(offset);
 				kfh.SetString(name, field.c_str(), title);
+				LOG_INFO("SetString(name: %s field %s title %S)\n", name, field.c_str(), title);
+			} else {
+				LOG_INFO("RemoveKey(name: %s field %s)\n", name, field.c_str());
+				kfh.RemoveKey(name, field);
 			}
 			offset++;
 		}
@@ -336,7 +352,7 @@ enum {
 	WinCfgMaxIndex
 };
 
-#define FIELDS_LIST_SIZE 5
+#define FIELDS_LIST_SIZE 8
 
 LONG_PTR WINAPI CfgDialogProc(HANDLE hDlg, int msg, int param1, LONG_PTR param2)
 {
@@ -416,10 +432,17 @@ void PluginCfg::FillFields(HANDLE hDlg, int listIndex, int index)
 				columnTypes += f->second.fieldType;
 				columnWidths += std::to_wstring(f->second.fieldWidth);
 
+				LOG_INFO("cfg.columnTitles[index][li.ItemIndex] %p\n", cfg.columnTitles[index][li.ItemIndex]);
 				free((void *)cfg.columnTitles[index][li.ItemIndex]);
 				cfg.columnTitles[index][li.ItemIndex] = wcsdup(li.Item.Text);
 			}
 			li.ItemIndex++;
+		}
+
+		while( total > li.ItemIndex && cfg.columnTitles[index][li.ItemIndex] ) {
+				free((void *)cfg.columnTitles[index][li.ItemIndex]);
+				cfg.columnTitles[index][li.ItemIndex] = 0;
+				li.ItemIndex++;
 		}
 
 		if( !columnTypes.empty() ) {
@@ -428,9 +451,7 @@ void PluginCfg::FillFields(HANDLE hDlg, int listIndex, int index)
 				free((void *)cfg.columnWidths[index]);
 				cfg.columnWidths[index] = wcsdup(columnWidths.c_str());
 		}
-
 }
-
 
 int PluginCfg::Configure(int itemNumber)
 {

@@ -16,6 +16,9 @@ class Plugin {
 		// Configuration
 		PluginCfg * cfg;
 
+		// config change
+		bool config_change;
+
 		// Panels
 		std::vector<std::unique_ptr<FarPanel>> panel;
 
@@ -43,6 +46,7 @@ class Plugin {
 		virtual int DeleteFiles(HANDLE hPlugin, struct PluginPanelItem *panelItem, int itemsNumber, int opMode);
 		virtual int ProcessKey(HANDLE hPlugin,int key,unsigned int controlState);
 		virtual int ProcessEvent(HANDLE hPlugin,int event,void *param);
+		virtual int GetFiles(HANDLE hPlugin,struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode);
 		virtual int Configure(int itemNumber);
 };
 

@@ -30,6 +30,8 @@ public:
 	int ProcessEvent(int event, void *param) override;
 	void GetOpenPluginInfo(struct OpenPluginInfo * info) override;
 	int DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, int opMode) override;
+	int GetFiles(struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode) override;
+	int SetDirectory(const wchar_t *dir, int opMode) override;
 	explicit ProcPanel(PanelIndex index, std::unique_ptr<Processes> & processes);
 	virtual ~ProcPanel();
 };

@@ -97,7 +97,7 @@ void Processes::Log(void)
 
 #ifdef MAIN_PROCESSES
 
-int RootExec(const char * cmd)
+int RootExec(const char * cmd, int flags)
 {
 	std::string _cmd("sudo /bin/sh -c \'");
 	_cmd += cmd;
@@ -106,7 +106,7 @@ int RootExec(const char * cmd)
 	return system(_cmd.c_str());
 }
 
-int Exec(const char * cmd)
+int Exec(const char * cmd, int flags)
 {
 	std::string _cmd("/bin/sh -c \'");
 	_cmd += cmd;

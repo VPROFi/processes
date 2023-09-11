@@ -9,9 +9,21 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/sysmacros.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <cstring>
 #include <memory>
+
+enum EXECUTEFLAGS
+{
+	EF_HIDEOUT = 0x01,    // dont display output of the command
+	EF_NOWAIT = 0x02,     // dont wait for command completion
+	EF_SUDO = 0x04,       // command must be run with root priviledges
+	EF_NOTIFY = 0x08,     // notify when command completed (if such notifications enabled in settings)
+	EF_NOCMDPRINT = 0x10, // dont print command in command line nor include it to history
+	EF_OPEN = 0x20        // use desktop shell (if present) to open command (e.g. URLs, documents..)
+};
 
 #ifndef MAIN_PROCESS
 extern const char * LOG_FILE;
@@ -66,13 +78,33 @@ void Process::Update()
 	sched = -1;
 	nlwp = 0;
 
+	std::string path("/proc/");
+	path += std::to_string(pid);
+	struct stat sbuf;
+	if( stat(path.c_str(), &sbuf) == 0 ) {
+		LOG_INFO("User ID of owner: %d\n", sbuf.st_uid);
+		LOG_INFO("Group ID of owner: %d\n", sbuf.st_gid);
+		const struct passwd* userData = getpwuid(sbuf.st_uid);
+		if( userData && userData->pw_name ) {
+			user = userData->pw_name;
+			LOG_INFO("userData.pw_name: %s\n", userData->pw_name);
+		}
+	    struct group *gr = getgrgid(sbuf.st_gid);
+		if( gr && gr->gr_name ) {
+			group = gr->gr_name;
+			LOG_INFO("gr->gr_name: %s\n", gr->gr_name);
+		}
+	} else {
+		LOG_ERROR("stat(\"%s\") ... error (%s)\n", path.c_str(), errorname(errno));
+	}
+
 	char * buf = GetFileData("/proc/%u/stat", pid, 0, 0);
 	if( !buf )
 		return;
 
 	valid = false;
 	do {
-		char *s = strrchr(buf, '(')+1;
+		char *s = strchr(buf, '(')+1;
 		if( !s ) break;
 		char *s2 = strrchr(s, ')');
 		if( !s2 || !s2[1]) break;
@@ -174,6 +206,7 @@ std::string Process::GetTempName(void) const
 	char path[sizeof("/tmp/processXXXXXX")];
 	memmove(path, "/tmp/processXXXXXX", sizeof("/tmp/processXXXXXX"));
 	int f = mkstemp(&path[0]);
+	fchmod(f, 0666);
 	close(f);
 	return std::string(path);
 }
@@ -185,15 +218,15 @@ char * Process::GetProcInfo(const char * info, ssize_t *readed) const
 	cmd += "/proc/";
 	cmd += std::to_string(pid) + "/";
 	cmd += info;
-	cmd += " >>";
+	cmd += " 2>/dev/null >>";
 	cmd += path;
-	if( Exec(cmd.c_str()) ) {
-		if( RootExec(cmd.c_str()) ) {
+	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
+		if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
+			LOG_ERROR("try execute cmd: %s\n", cmd.c_str());
 			cmd = "sudo " + cmd;
-			Exec(cmd.c_str());
+			Exec(cmd.c_str(), 0);
 		}
 	}
-
 	LOG_INFO("get data from: %s\n", path.c_str());
 	auto buf = ::GetFileData(path.c_str(), readed);
 	LOG_INFO("unlink: %s\n", path.c_str());
@@ -204,18 +237,19 @@ char * Process::GetProcInfo(const char * info, ssize_t *readed) const
 char * Process::GetFilesInfo(ssize_t *readed) const
 {
 	std::string path(std::move(GetTempName()));
+
 	std::string cmd("ls -l ");
 	cmd += "/proc/";
 	cmd += std::to_string(pid) + "/fd";
-	cmd += " >>";
+	cmd += " 2>/dev/null >>";
 	cmd += path;
-	if( Exec(cmd.c_str()) ) {
-		if( RootExec(cmd.c_str()) ) {
+	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
+		if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
+			LOG_ERROR("try execute cmd: %s\n", cmd.c_str());
 			cmd = "sudo " + cmd;
-			Exec(cmd.c_str());
+			Exec(cmd.c_str(), 0);
 		}
 	}
-
 	LOG_INFO("get data from: %s\n", path.c_str());
 	auto buf = ::GetFileData(path.c_str(), readed);
 	LOG_INFO("unlink: %s\n", path.c_str());
@@ -223,14 +257,41 @@ char * Process::GetFilesInfo(ssize_t *readed) const
 	return buf;
 }
 
+std::string Process::GetProcInfoToString(const char * field, const char * separator)
+{
+	std::string res;
+	ssize_t readed = 0;
+	char * buf = GetProcInfo(field, &readed);
+	if( buf ) {
+		auto ptr = buf;
+		while( readed > 0 ) {
+			ssize_t size = strlen(ptr)+1;
+			assert( readed >= size );
+			if( *ptr ) {
+				if( !res.empty() )
+					res += separator;
+				res += ptr;
+			}
+			ptr += size;
+			readed -= size;
+		}
+		FreeFileData(buf);
+	}
+	return res;
+}
 
-std::string Process::CreateProcessInfo(void)
+std::string Process::CreateProcessInfo(const char * filePath)
 {
 	auto skts = std::make_unique<Sockets>();
 	if( skts != nullptr )
 		skts->Update();
 
-	std::string path(std::move(GetTempName()));
+	std::string path;
+
+	if( filePath )
+		path = std::move(filePath);
+	else
+		path = std::move(GetTempName());
 
 	FILE* file = fopen(path.c_str(), "a");
 	if( !file ) {
@@ -240,62 +301,25 @@ std::string Process::CreateProcessInfo(void)
 
 	LOG_INFO("path: %s\n", path.c_str());
 
-	fprintf(file, "pid: %d\n", pid);
-	fprintf(file, "name: %s\n", name.c_str());
+	fprintf(file, "pid:             | %d\nname:            | %s\nuser/group:      | %s:%s\nstate:           | %c\n", pid, name.c_str(), user.c_str(), group.c_str(), state);
+	fprintf(file, "virtual memory:  | %s\n", size_to_str((unsigned long long)m_virt*pageSize));
+	fprintf(file, "resident memory: | %s\n", size_to_str((unsigned long long)m_resident*pageSize));
+	if( startTimeMs )
+		fprintf(file, "start_time:      | %s\n", msec_to_str(GetRealtimeMs() - startTimeMs));
+	fprintf(file, "other:           | ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d priority: %d, nice: %d\n", ppid, pgrp, session, tty, tpgid, priority, nice);
+	//fprintf(file, "flags: 0x%08lX, min_flt: %ld, cmin_flt: %ld, maj_flt: %ld, cmaj_flt: %ld\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
+	//fprintf(file, "utime %llu, stime %llu, cutime %llu, cstime %llu\n", utime, stime, cutime, cstime);
 
 
-	std::string cmdline;
+	std::string env = GetProcInfoToString("environ", "\n");
+	std::string cmdline = GetProcInfoToString("cmdline", " ");
 	std::string sockets;
 	std::string net;
 	std::string files;
 	std::string maps;
 
 	ssize_t readed = 0;
-	char * buf = GetProcInfo("cmdline", &readed);
-	if( buf ) {
-		auto ptr = buf;
-		while( readed > 0 ) {
-			auto size = strlen(ptr)+1;
-			assert( readed >= size );
-			if( *ptr ) {
-				cmdline += ' ';
-				cmdline += ptr;
-			}
-			ptr += size;
-			readed -= size;
-		}
-		FreeFileData(buf);
-	}
-
-	fprintf(file, "cmdline with arguments: %s\n", cmdline.c_str());
-	fprintf(file, "state: %c\n", state);
-	fprintf(file, "ppid: %d, pgrp: %d, session: %d, tty: %d, tpgid: %d\n", ppid, pgrp, session, tty, tpgid);
-	//fprintf(file, "flags: 0x%08lX, min_flt: %ld, cmin_flt: %ld, maj_flt: %ld, cmaj_flt: %ld\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
-	//fprintf(file, "utime %llu, stime %llu, cutime %llu, cstime %llu\n", utime, stime, cutime, cstime);
-	fprintf(file, "priority: %d, nice: %d\n", priority, nice);
-	fprintf(file, "virtual memory: %s\n", size_to_str((unsigned long long)m_virt*pageSize));
-	fprintf(file, "resident memory: %s\n", size_to_str((unsigned long long)m_resident*pageSize));
-	if( startTimeMs )
-		fprintf(file, "start_time: %s\n", msec_to_str(GetRealtimeMs() - startTimeMs));
-
-	buf = GetProcInfo("environ", &readed);
-
-	if( buf ) {
-		auto ptr = buf;
-		fprintf(file, "\nenviron: \n\n");
-		while( readed > 0 ) {
-			auto size = strlen(ptr)+1;
-			assert( readed >= size );
-			if( *ptr )
-				fprintf(file, "%s\n", ptr);
-			ptr += size;
-			readed -= size;
-		}
-		FreeFileData(buf);
-	}
-
-	readed = 0;
-	buf = GetProcInfo("maps", &readed);
+	char * buf = GetProcInfo("maps", &readed);
 	if( buf ) {
 		auto ptr = buf;
 		ssize_t num = 0;
@@ -306,8 +330,8 @@ std::string Process::CreateProcessInfo(void)
 		}
 
 		while( readed > 0 ) {
-			auto size = strlen(ptr)+1;
 
+			ssize_t  size = strlen(ptr)+1;
 			assert( readed >= size );
 
 			if( size > 49 && (ptr[20] == 'x' || ptr[28] == 'x' || ptr[24] == 'x' || ptr[36] == 'x' || (size > 73 && ptr[73] == '[') || ptr[49] == '[' ) ) {
@@ -334,7 +358,8 @@ std::string Process::CreateProcessInfo(void)
 		auto ptr = buf;
 
 		while( readed > 0 ) {
-			auto size = strlen(ptr)+1;
+
+			ssize_t size = strlen(ptr)+1;
 			assert( readed >= size );
 
 			auto lnk = strstr(ptr, " -> ");
@@ -376,9 +401,19 @@ std::string Process::CreateProcessInfo(void)
 		FreeFileData(buf);
 	}
 
+	if( !cmdline.empty() ) {
+		fprintf(file, "\ncmdline: \n\n");
+		fprintf(file, "%s\n", cmdline.c_str());
+	}
+
 	if( !net.empty() ) {
 		fprintf(file, "\nnetwork: \n\n");
 		fprintf(file, "%s", net.c_str());
+	}
+
+	if( !env.empty() ) {
+		fprintf(file, "\nenviron: \n\n");
+		fprintf(file, "%s\n", env.c_str());
 	}
 
 	if( !maps.empty() ) {
@@ -456,7 +491,7 @@ bool Process::Kill(void) const
 
 #ifdef MAIN_PROCESS
 
-int RootExec(const char * cmd)
+int RootExec(const char * cmd, int flags)
 {
 	std::string _cmd("sudo /bin/sh -c \'");
 	_cmd += cmd;
@@ -465,7 +500,7 @@ int RootExec(const char * cmd)
 	return system(_cmd.c_str());
 }
 
-int Exec(const char * cmd)
+int Exec(const char * cmd, int flags)
 {
 	std::string _cmd("/bin/sh -c \'");
 	_cmd += cmd;

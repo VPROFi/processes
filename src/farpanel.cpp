@@ -25,6 +25,13 @@ FarPanel::FarPanel(uint32_t index_):
 	FillPanelData(data.get(), index);
 }
 
+void FarPanel::UdpatePanelInfo(void)
+{
+	LOG_INFO("\n");
+	if( Valid() )
+		FillPanelData(data.get(), index);
+};
+
 FarPanel::~FarPanel()
 {
 	LOG_INFO("\n");
@@ -56,6 +63,12 @@ int FarPanel::SetDirectory(const wchar_t *dir, int opMode)
 }
 
 int FarPanel::DeleteFiles(struct PluginPanelItem *panelItem, int itemsNumber, int opMode)
+{
+	LOG_INFO("\n");
+	return int(false);
+}
+
+int FarPanel::GetFiles(struct PluginPanelItem *panelItem,int itemsNumber,int move, const wchar_t ** destPath, int opMode)
 {
 	LOG_INFO("\n");
 	return int(false);
@@ -103,6 +116,12 @@ void FarPanel::FreeFindData(struct PluginPanelItem * panelItem, int itemsNumber)
 {
 	LOG_INFO("\n");
 	while( itemsNumber-- ) {
+
+		if( (panelItem+itemsNumber)->Owner )
+			free((void *)(panelItem+itemsNumber)->Owner);
+		if( (panelItem+itemsNumber)->Group )
+			free((void *)(panelItem+itemsNumber)->Group);
+
 		while( (panelItem+itemsNumber)->CustomColumnNumber-- )
 			free((void *)(panelItem+itemsNumber)->CustomColumnData[(panelItem+itemsNumber)->CustomColumnNumber]);
 		free((void *)(panelItem+itemsNumber)->CustomColumnData);

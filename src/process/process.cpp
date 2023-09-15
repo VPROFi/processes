@@ -211,53 +211,49 @@ std::string Process::GetTempName(void) const
 	return std::string(path);
 }
 
-char * Process::GetProcInfo(const char * info, ssize_t *readed) const
+char * Process::GetCommandOutput(std::string & cmd, ssize_t *readed) const
 {
 	std::string path(std::move(GetTempName()));
+	char * buf = nullptr;
+
+	cmd += " 2>/dev/null >>";
+	cmd += path;
+
+	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) == 0 )
+		buf = ::GetFileData(path.c_str(), readed);
+
+	// /tmp dir use (sticky bit), remove file before use root
+	unlink(path.c_str());
+
+	if( buf )
+		return buf;
+
+	if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) == 0 )
+		buf = ::GetFileData(path.c_str(), readed);
+
+	path = "rm " + path;
+	RootExec(path.c_str(), EF_NOCMDPRINT | EF_HIDEOUT);
+	return buf;
+}
+
+char * Process::GetProcInfo(const char * info, ssize_t *readed) const
+{
 	std::string cmd("cat ");
 	cmd += "/proc/";
 	cmd += std::to_string(pid) + "/";
 	cmd += info;
-	cmd += " 2>/dev/null >>";
-	cmd += path;
-	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
-		if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
-			LOG_ERROR("try execute cmd: %s\n", cmd.c_str());
-			cmd = "sudo " + cmd;
-			Exec(cmd.c_str(), 0);
-		}
-	}
-	LOG_INFO("get data from: %s\n", path.c_str());
-	auto buf = ::GetFileData(path.c_str(), readed);
-	LOG_INFO("unlink: %s\n", path.c_str());
-	unlink(path.c_str());
-	return buf;
+	return GetCommandOutput(cmd, readed);
 }
 
 char * Process::GetFilesInfo(ssize_t *readed) const
 {
-	std::string path(std::move(GetTempName()));
-
 	std::string cmd("ls -l ");
 	cmd += "/proc/";
 	cmd += std::to_string(pid) + "/fd";
-	cmd += " 2>/dev/null >>";
-	cmd += path;
-	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
-		if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) ) {
-			LOG_ERROR("try execute cmd: %s\n", cmd.c_str());
-			cmd = "sudo " + cmd;
-			Exec(cmd.c_str(), 0);
-		}
-	}
-	LOG_INFO("get data from: %s\n", path.c_str());
-	auto buf = ::GetFileData(path.c_str(), readed);
-	LOG_INFO("unlink: %s\n", path.c_str());
-	unlink(path.c_str());
-	return buf;
+	return GetCommandOutput(cmd, readed);
 }
 
-std::string Process::GetProcInfoToString(const char * field, const char * separator)
+std::string Process::GetProcInfoToString(const char * field, const char * separator) const
 {
 	std::string res;
 	ssize_t readed = 0;

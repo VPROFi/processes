@@ -154,9 +154,10 @@ struct Process {
 	explicit Process(pid_t pid);
 	~Process();
 protected:
+	char * GetCommandOutput(std::string & cmd, ssize_t *readed) const;
 	char * GetProcInfo(const char * info, ssize_t *readed) const;
 	char * GetFilesInfo(ssize_t *readed) const;
-	std::string GetProcInfoToString(const char * field, const char * separator);
+	std::string GetProcInfoToString(const char * field, const char * separator) const;
 };
 
 #endif // __PROCESS_H__

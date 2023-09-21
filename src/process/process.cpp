@@ -374,13 +374,13 @@ std::string Process::GetProcStatus(void) const
 		    memcmp(ptr, "CapEff:\t", 8) == 0 || \
 		    memcmp(ptr, "CapBnd:\t", 8) == 0 ) {
 			cap = strtoull(&ptr[8], 0, 16);
+			ptr[strlen(ptr)-2] = 0;
+			status += ptr;
 			if( cap ) {
-				ptr[strlen(ptr)-2] = 0;
-				status += ptr;
 				status += " ";
 				CapabilitiesToString(status, cap);
-				status += "\n";
 			}
+			status += "\n";
 		}
 	}
 	fclose(fs);

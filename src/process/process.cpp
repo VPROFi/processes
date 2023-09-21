@@ -276,6 +276,117 @@ std::string Process::GetProcInfoToString(const char * field, const char * separa
 	return res;
 }
 
+#ifndef MAX_LINE_LENGTH
+#define MAX_LINE_LENGTH 1024
+#endif
+
+void Process::CapabilitiesToString(std::string & str, uint64_t cap) const
+{
+	#define __CAP_BITS   38
+	#define __CAPS_ALL   ((1ll<<__CAP_BITS)-1)
+	static const char * cap_names[__CAP_BITS] = {
+	      /* 0 */	"cap_chown",
+	      /* 1 */	"cap_dac_override",
+	      /* 2 */	"cap_dac_read_search",
+	      /* 3 */	"cap_fowner",
+	      /* 4 */	"cap_fsetid",
+	      /* 5 */	"cap_kill",
+	      /* 6 */	"cap_setgid",
+	      /* 7 */	"cap_setuid",
+	      /* 8 */	"cap_setpcap",
+	      /* 9 */	"cap_linux_immutable",
+	      /* 10 */	"cap_net_bind_service",
+	      /* 11 */	"cap_net_broadcast",
+	      /* 12 */	"cap_net_admin",
+	      /* 13 */	"cap_net_raw",
+	      /* 14 */	"cap_ipc_lock",
+	      /* 15 */	"cap_ipc_owner",
+	      /* 16 */	"cap_sys_module",
+	      /* 17 */	"cap_sys_rawio",
+	      /* 18 */	"cap_sys_chroot",
+	      /* 19 */	"cap_sys_ptrace",
+	      /* 20 */	"cap_sys_pacct",
+	      /* 21 */	"cap_sys_admin",
+	      /* 22 */	"cap_sys_boot",
+	      /* 23 */	"cap_sys_nice",
+	      /* 24 */	"cap_sys_resource",
+	      /* 25 */	"cap_sys_time",
+	      /* 26 */	"cap_sys_tty_config",
+	      /* 27 */	"cap_mknod",
+	      /* 28 */	"cap_lease",
+	      /* 29 */	"cap_audit_write",
+	      /* 30 */	"cap_audit_control",
+	      /* 31 */	"cap_setfcap",
+	      /* 32 */	"cap_mac_override",
+	      /* 33 */	"cap_mac_admin",
+	      /* 34 */	"cap_syslog",
+	      /* 35 */	"cap_wake_alarm",
+	      /* 36 */	"cap_block_suspend",
+	      /* 37 */	"cap_audit_read"
+	};
+
+	cap = cap & __CAPS_ALL;
+
+	if( cap == __CAPS_ALL ) {
+		str += "full";
+		return;
+	}
+
+	size_t offset = 0;
+	while( cap && offset < sizeof(cap_names)/sizeof(cap_names[0]) ) {
+		if( cap & 1 ) {
+			str += cap_names[offset];
+			if( cap >> 1 )
+			str += ", ";
+		}
+		cap = cap >> 1;
+		offset += 1;
+	};
+}
+
+std::string Process::GetProcStatus(void) const
+{
+	std::string status;
+
+	char path[sizeof("/proc/4294967296/status")];
+	if( snprintf(path, sizeof(path), "/proc/%u/status", pid) < 0 ) {
+		LOG_ERROR("snprintf(fmt=\"/proc/%u/status\") ... error (%s)\n", pid, errorname(errno));
+		return status;
+	}
+
+	auto fs = fopen(path, "r");
+	if( !fs ) {
+		LOG_ERROR("fopen(\"%s\") ... error (%s)\n", path, errorname(errno));
+		return status;
+	}
+
+	auto buf = std::make_unique<char[]>(MAX_LINE_LENGTH+1);
+	char * ptr = buf.get();
+	size_t size = MAX_LINE_LENGTH+1;
+
+	uint64_t cap = 0;
+
+	while( fgets(ptr, size, fs) ) {
+		if( memcmp(ptr, "Cap", 3) != 0 )
+			continue;
+		if( memcmp(ptr, "CapInh:\t", 8) == 0 || \
+		    memcmp(ptr, "CapPrm:\t", 8) == 0 || \
+		    memcmp(ptr, "CapEff:\t", 8) == 0 || \
+		    memcmp(ptr, "CapBnd:\t", 8) == 0 ) {
+			cap = strtoull(&ptr[8], 0, 16);
+			if( cap ) {
+				ptr[strlen(ptr)-2] = 0;
+				status += ptr;
+				status += " ";
+				CapabilitiesToString(status, cap);
+				status += "\n";
+			}
+		}
+	}
+	fclose(fs);
+	return status;
+}
+
 std::string Process::CreateProcessInfo(const char * filePath)
 {
 	auto skts = std::make_unique<Sockets>();
@@ -313,6 +424,7 @@ std::string Process::CreateProcessInfo(const char * filePath)
 	std::string net;
 	std::string files;
 	std::string maps;
+	std::string status = GetProcStatus();
 
 	ssize_t readed = 0;
 	char * buf = GetProcInfo("maps", &readed);
@@ -410,6 +522,11 @@ std::string Process::CreateProcessInfo(const char * filePath)
 	if( !env.empty() ) {
 		fprintf(file, "\nenviron: \n\n");
 		fprintf(file, "%s\n", env.c_str());
+	}
+
+	if( !status.empty() ) {
+		fprintf(file, "\nstatus: \n\n");
+		fprintf(file, "%s\n", status.c_str());
 	}
 
 	if( !maps.empty() ) {

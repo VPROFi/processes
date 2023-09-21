@@ -157,6 +157,8 @@ protected:
 	char * GetCommandOutput(std::string & cmd, ssize_t *readed) const;
 	char * GetProcInfo(const char * info, ssize_t *readed) const;
 	char * GetFilesInfo(ssize_t *readed) const;
+	void CapabilitiesToString(std::string & str, uint64_t cap) const;
+	std::string GetProcStatus(void) const;
 	std::string GetProcInfoToString(const char * field, const char * separator) const;
 };
 

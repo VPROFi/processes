@@ -43,7 +43,7 @@ void progress::show()
 {
 	if (!_visible) {
 		_visible = true;
-		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSSTATE, (void*)PGS_INDETERMINATE);
+		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSSTATE, (void*)PGS_INDETERMINATE, 0);
 	}
 
 	if (_bar.empty()) {
@@ -60,8 +60,8 @@ void progress::show()
 void progress::hide()
 {
 	if (_visible) {
-		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_PROGRESSNOTIFY, 0);
-		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSSTATE, (void*)PGS_NOPROGRESS);
+		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_PROGRESSNOTIFY, 0, 0);
+		Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSSTATE, (void*)PGS_NOPROGRESS, 0);
 		Plugin::psi.Control(PANEL_ACTIVE, FCTL_REDRAWPANEL, 0, 0);
 		Plugin::psi.Control(PANEL_PASSIVE, FCTL_REDRAWPANEL, 0, 0);
 		_visible = false;
@@ -81,7 +81,7 @@ void progress::update(const uint64_t val)
 	memset(&pv, 0, sizeof(pv));
 	pv.Completed = percent;
 	pv.Total = 100;
-	Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSVALUE, &pv);
+	Plugin::psi.AdvControl(Plugin::psi.ModuleNumber, ACTL_SETPROGRESSVALUE, &pv, 0);
 
 	if (_bar.empty())
 		_bar.resize(PROGRESS_WIDTH);

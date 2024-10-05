@@ -5,7 +5,7 @@ project(processes)
 get_directory_property(PROJECT_SOURCE_DIR DIRECTORY ../ DEFINITION PROJECT_SOURCE_DIR)
 get_directory_property(INSTALL_DIR DIRECTORY ${PROJECT_SOURCE_DIR} DEFINITION INSTALL_DIR)
 
-message("processes PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR} ${CMAKE_SYSTEM_NAME}")
+message(STATUS "${PROJECT_NAME} PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR} ${CMAKE_SYSTEM_NAME}")
 
 set(SOURCES
 farconnect.cpp
@@ -46,25 +46,25 @@ if (ARM AND CMAKE_COMPILER_IS_GNUCC)
     endif (GCC_HAS_NO_PSABI)
 endif ()
 
-add_library(processes MODULE ${SOURCES})
-target_link_libraries(processes utils far2l)
+add_library(${PROJECT_NAME} MODULE ${SOURCES})
+target_link_libraries(${PROJECT_NAME} utils far2l)
 
-target_compile_definitions(processes PRIVATE -DUSEUCD=OFF -DWINPORT_DIRECT -DUNICODE -DFAR_DONT_USE_INTERNALS)
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DUSEUCD=OFF -DWINPORT_DIRECT -DUNICODE -DFAR_DONT_USE_INTERNALS)
 
-target_include_directories(processes PRIVATE .)
-target_include_directories(processes PRIVATE ./process)
-target_include_directories(processes PRIVATE ${PROJECT_SOURCE_DIR}/utils/include)
-target_include_directories(processes PRIVATE ${PROJECT_SOURCE_DIR}/far2l/far2sdk)
-target_include_directories(processes PRIVATE ${PROJECT_SOURCE_DIR}/far2l/Include)
-target_include_directories(processes PRIVATE ${PROJECT_SOURCE_DIR}/WinPort)
+target_include_directories(${PROJECT_NAME} PRIVATE .)
+target_include_directories(${PROJECT_NAME} PRIVATE ./process)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/utils/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/far2l/far2sdk)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/far2l/Include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/WinPort)
 
-set_target_properties(processes
+set_target_properties(${PROJECT_NAME}
     PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${INSTALL_DIR}/Plugins/processes/plug"
+        LIBRARY_OUTPUT_DIRECTORY "${INSTALL_DIR}/Plugins/${PROJECT_NAME}/plug"
         PREFIX ""
         SUFFIX ".far-plug-wide")
 
-add_custom_command(TARGET processes POST_BUILD
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/configs
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/configs "${INSTALL_DIR}/Plugins/processes"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/configs "${INSTALL_DIR}/Plugins/${PROJECT_NAME}"
 )

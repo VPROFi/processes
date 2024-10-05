@@ -14,6 +14,7 @@ add_subdirectory(vendor/far2l)
 
 # build plugin
 set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/far2l)
-get_directory_property(INSTALL_DIR DIRECTORY ${PROJECT_SOURCE_DIR} DEFINITION INSTALL_DIR)
+set(FAR_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/far2l)
+get_directory_property(INSTALL_DIR DIRECTORY ${FAR_SOURCE_DIR} DEFINITION INSTALL_DIR)
 
 add_subdirectory(src)

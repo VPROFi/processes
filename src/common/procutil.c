@@ -59,10 +59,12 @@ char * GetFileData(const char * path, ssize_t *readed)
 		}
 
 		while( (cur_read = read(fd, buf + tot_read, size - tot_read)) > 0 ) {
+			char * old = buf;
         		tot_read += cur_read;
 		        if( tot_read < size ) break;
 		        buf = (char *)realloc(buf, (size += buffGRW));
 			if( !buf ) {
+				free((void *)old);
 				LOG_ERROR("malloc(" LLFMT ") ... error (%s)\n", size, errorname(errno));
 				break;
 			}

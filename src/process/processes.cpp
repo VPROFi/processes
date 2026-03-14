@@ -68,11 +68,21 @@ bool Processes::Update(void)
 	}
 	closedir(proc);
 
+	// filter invalid
 	std::set<pid_t> invalid_pid;
+	// make names unique
+	std::set<std::string> unique_names;
 
 	for( const auto& [id, ps] : procs )
 		if( valid_pid.find(id) == valid_pid.end() )
 			invalid_pid.insert(id);
+		else if( unique_names.find(ps->name) == unique_names.end() ) {
+				unique_names.insert(ps->name);
+			} else {
+				// append pid
+				ps->name += ".<"+std::to_string(id)+">";
+				//LOG_INFO("[%d] make name %s unique\n", id, ps->name.c_str());
+			}
 
 	for( const auto _pid : invalid_pid ) {
 		LOG_INFO("delete process %u\n", _pid);

@@ -154,12 +154,14 @@ struct Process {
 	explicit Process(pid_t pid);
 	~Process();
 protected:
+	char * PipeExec(const char * cmd, ssize_t *readed) const;
 	char * GetCommandOutput(std::string & cmd, ssize_t *readed) const;
-	char * GetProcInfo(const char * info, ssize_t *readed) const;
+	char * GetRootCommandOutput(std::string & cmd, ssize_t *readed) const;
+	char * GetProcInfo(const char * info, ssize_t *readed, pid_t _pid) const;
 	char * GetFilesInfo(ssize_t *readed) const;
 	void CapabilitiesToString(std::string & str, uint64_t cap) const;
 	std::string GetProcStatus(void) const;
-	std::string GetProcInfoToString(const char * field, const char * separator) const;
+	std::string GetProcInfoToString(const char * field, const char * separator, pid_t _pid) const;
 };
 
 #endif // __PROCESS_H__

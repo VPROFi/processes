@@ -41,6 +41,70 @@ const char * LOG_FILE = "";
     #error "Environment not 32 or 64-bit."
 #endif
 
+#include <sys/wait.h>
+#include <vector>
+
+char * Process::PipeExec(const char * cmd, ssize_t *readed) const
+{
+	char * buf = nullptr;
+
+	LOG_INFO("PipeExec(%s)\n", cmd);
+
+	// Лямбда-функция для выполнения команды и чтения вывода через pipe
+	auto run = [&](const std::string& shell_cmd) -> bool {
+		FILE* raw_fp = popen(shell_cmd.c_str(), "r");
+		if( !raw_fp ) return false;
+
+		// RAII обертка: гарантирует вызов pclose при выходе из области видимости или при исключении
+		auto fp_closer = [](FILE* f) { pclose(f); };
+		std::unique_ptr<FILE, decltype(fp_closer)> fp(raw_fp, fp_closer);
+
+		std::vector<char> output;
+		char tmp[1024];
+		size_t n;
+
+		// Читаем данные порциями
+		while( (n = fread(tmp, 1, sizeof(tmp), fp.get())) > 0 ) {
+			output.insert(output.end(), tmp, tmp + n);
+		}
+
+		// Проверяем ошибки чтения (например, диск переполнен)
+		if( ferror(fp.get()) ) {
+			return false;
+		}
+
+		// Получаем статус завершения процесса.
+		// release() освобождает владение указателем, чтобы unique_ptr не вызвал pclose повторно.
+		// Мы вызываем pclose вручную, чтобы получить код возврата.
+		int status = pclose(fp.release());
+
+		// Проверяем успешность выполнения (код возврата 0)
+		if( WIFEXITED(status) && WEXITSTATUS(status) == 0 ) {
+			if( readed ) *readed = output.size();
+
+			// Выделяем память под результат (+1 для нуль-терминатора)
+			buf = (char*)malloc(output.size() + 1);
+			if( buf ) {
+				memcpy(buf, output.data(), output.size());
+				buf[output.size()] = '\0';
+				return true;
+			}
+		}
+		return false;
+	};
+
+	std::string command = "/bin/sh -c \'";
+	command += cmd;
+	command += " 2>/dev/null'";
+	
+	if( run(command.c_str()) ) {
+		LOG_INFO("execpipe \"%s\" success\n", cmd);
+		return buf;
+	}
+
+	return nullptr;
+}
+
 void Process::FreeFileData(char * buf) const
 {
 	::FreeFileData(buf);
@@ -64,7 +128,7 @@ static uint64_t GetHZ(void)
 	if( !hz )
 		hz = sysconf(_SC_CLK_TCK);
 
-	if( !hz )
+	if( !hz || hz == -1 )
 		hz = 100;
 
 	return hz;
@@ -89,7 +153,7 @@ void Process::Update()
 			user = userData->pw_name;
 			LOG_INFO("userData.pw_name: %s\n", userData->pw_name);
 		}
-	    struct group *gr = getgrgid(sbuf.st_gid);
+		struct group *gr = getgrgid(sbuf.st_gid);
 		if( gr && gr->gr_name ) {
 			group = gr->gr_name;
 			LOG_INFO("gr->gr_name: %s\n", gr->gr_name);
@@ -104,8 +168,9 @@ void Process::Update()
 
 	valid = false;
 	do {
-		char *s = strchr(buf, '(')+1;
+		char *s = strchr(buf, '(');
 		if( !s ) break;
+		s++;
 		char *s2 = strrchr(s, ')');
 		if( !s2 || !s2[1]) break;
 		name = std::string(s,strrchr(s, ')'));
@@ -211,22 +276,16 @@ std::string Process::GetTempName(void) const
 	return std::string(path);
 }
 
-char * Process::GetCommandOutput(std::string & cmd, ssize_t *readed) const
+char * Process::GetRootCommandOutput(std::string & cmd, ssize_t *readed) const
 {
-	std::string path(std::move(GetTempName()));
 	char * buf = nullptr;
-
-	cmd += " 2>/dev/null >>";
-	cmd += path;
-
-	if( Exec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) == 0 )
-		buf = ::GetFileData(path.c_str(), readed);
+	std::string path(GetTempName());
 
 	// /tmp dir use (sticky bit), remove file before use root
 	unlink(path.c_str());
 
-	if( buf )
-		return buf;
+	cmd += " 2>/dev/null >>";
+	cmd += path;
 
 	if( RootExec(cmd.c_str(), EF_NOCMDPRINT | EF_HIDEOUT) == 0 )
 		buf = ::GetFileData(path.c_str(), readed);
@@ -236,13 +295,38 @@ char * Process::GetCommandOutput(std::string & cmd, ssize_t *readed) const
 	return buf;
 }
 
-char * Process::GetProcInfo(const char * info, ssize_t *readed) const
+char * Process::GetCommandOutput(std::string & cmd, ssize_t *readed) const
 {
-	std::string cmd("cat ");
-	cmd += "/proc/";
-	cmd += std::to_string(pid) + "/";
-	cmd += info;
-	return GetCommandOutput(cmd, readed);
+	char * buf = PipeExec(cmd.c_str(), readed);
+	if( buf ) {
+		return buf;
+	}
+
+	// Если обычный запуск не удался (например, не хватило прав), пробуем через root
+	return GetRootCommandOutput(cmd, readed);
+}
+
+char * Process::GetProcInfo(const char * info, ssize_t *readed, pid_t _pid) const
+{
+	// Формируем путь к файлу в /proc
+	// Максимальная длина PID - 10 символов (4294967295), имя файла - переменной длины.
+	char path[sizeof("/proc/4294967296/task/4294967296/coredump_filter")];
+	int len = snprintf(path, sizeof(path), "/proc/%d/%s", _pid, info);
+	if( len < 0 || len >= (int)sizeof(path) ) {
+		LOG_ERROR("snprintf path too long or error for /proc/%d/%s\n", _pid, info);
+		return nullptr;
+	}
+
+	// 1. Пытаемся прочитать файл напрямую от имени текущего пользователя.
+	char * buf = ::GetFileData(path, readed);
+	if( buf ) {
+		return buf;
+	}
+	// Формируем команду: cat /proc/pid/info
+	std::string cmd = "cat ";
+	cmd += path; 
+
+	return GetRootCommandOutput(cmd, readed);
 }
 
 char * Process::GetFilesInfo(ssize_t *readed) const
@@ -253,11 +337,11 @@ char * Process::GetFilesInfo(ssize_t *readed) const
 	return GetCommandOutput(cmd, readed);
 }
 
-std::string Process::GetProcInfoToString(const char * field, const char * separator) const
+std::string Process::GetProcInfoToString(const char * field, const char * separator, pid_t _pid) const
 {
 	std::string res;
 	ssize_t readed = 0;
-	char * buf = GetProcInfo(field, &readed);
+	char * buf = GetProcInfo(field, &readed, _pid);
 	if( buf ) {
 		auto ptr = buf;
 		while( readed > 0 ) {
@@ -396,13 +480,13 @@ std::string Process::CreateProcessInfo(const char * filePath)
 	std::string path;
 
 	if( filePath )
-		path = std::move(filePath);
+		path = filePath;
 	else
 		path = std::move(GetTempName());
 
 	FILE* file = fopen(path.c_str(), "a");
 	if( !file ) {
-		LOG_ERROR("fopen(\"%s\", \"r\") ... error (%s)\n", path.c_str(), errorname(errno));
+		LOG_ERROR("fopen(\"%s\", \"a\") ... error (%s)\n", path.c_str(), errorname(errno));
 		return std::string();
 	}
 
@@ -417,9 +501,8 @@ std::string Process::CreateProcessInfo(const char * filePath)
 	//fprintf(file, "flags: 0x%08lX, min_flt: %ld, cmin_flt: %ld, maj_flt: %ld, cmaj_flt: %ld\n", flags, min_flt, cmin_flt, maj_flt, cmaj_flt);
 	//fprintf(file, "utime %llu, stime %llu, cutime %llu, cstime %llu\n", utime, stime, cutime, cstime);
 
-
-	std::string env = GetProcInfoToString("environ", "\n");
-	std::string cmdline = GetProcInfoToString("cmdline", " ");
+	std::string env = GetProcInfoToString("environ", "\n", pid);
+	std::string cmdline = GetProcInfoToString("cmdline", " ", pid);
 	std::string sockets;
 	std::string net;
 	std::string files;
@@ -427,7 +510,7 @@ std::string Process::CreateProcessInfo(const char * filePath)
 	std::string status = GetProcStatus();
 
 	ssize_t readed = 0;
-	char * buf = GetProcInfo("maps", &readed);
+	char * buf = GetProcInfo("maps", &readed, pid);
 	if( buf ) {
 		auto ptr = buf;
 		ssize_t num = 0;
@@ -482,9 +565,49 @@ std::string Process::CreateProcessInfo(const char * filePath)
 				if( fd++ > ptr ) {
 					if( *lnk == '/' || skts == nullptr || memcmp(lnk, "socket:[", sizeof("socket:[")-1) != 0 ) {
 						files += fd;
-						files += " -> ";
-						files += lnk;
-						files += "\n";
+
+						// Добавляем обработку pidfd
+						if (memcmp(lnk, "anon_inode:[pidfd]", 18) == 0) {
+							// Нам нужно узнать PID целевого процесса.
+							// Для этого читаем /proc/<pid>/fdinfo/<fd>
+							std::string fdinfo_path = "/proc/" + std::to_string(pid) + "/fdinfo/" + std::string(fd);
+							ssize_t info_readed = 0;
+							char * info_buf = ::GetFileData(fdinfo_path.c_str(), &info_readed);
+							std::string target_pid = "unknown";
+							std::string parent_cmdline = "";
+        
+							if( !info_buf ) {
+								// Формируем команду: cat /proc/pid/info
+								std::string cmd = "cat ";
+								cmd += fdinfo_path; 
+								info_buf = GetRootCommandOutput(cmd, &info_readed);
+							}
+        
+							if (info_buf) {
+								// Ищем строку "Pid:\t1234"
+								char * pid_line = strstr(info_buf, "Pid:\t");
+								if (pid_line) {
+									target_pid = pid_line + 5; // Пропускаем "Pid:\t"
+									// Убираем перевод строки, если есть
+									auto newline = target_pid.find('\n');
+									if (newline != std::string::npos) target_pid.erase(newline);
+									parent_cmdline = GetProcInfoToString("cmdline", " ", std::stoi(target_pid));
+									LOG_INFO("target_pid: %s - %d %s\n", target_pid.c_str(), std::stoi(target_pid), parent_cmdline.c_str());
+								}
+								FreeFileData(info_buf);
+							}
+								files += " -> pidfd:[";
+								files += target_pid;
+
+								files += "] ";
+								files += parent_cmdline;
+								files += "\n";
+						} else  {
+							files += " -> ";
+							files += lnk;
+							files += "\n";
+						}
+
 					} else {
 						sockets += fd;
 						sockets += " -> ";
@@ -608,18 +731,20 @@ int RootExec(const char * cmd, int flags)
 {
 	std::string _cmd("sudo /bin/sh -c \'");
 	_cmd += cmd;
-	_cmd += "'";
-	LOG_INFO("Try exec \"%s\"\n", _cmd.c_str());
-	return system(_cmd.c_str());
+	_cmd += "\'";
+        int res = system(_cmd.c_str());
+	LOG_INFO("RootExec \"%s\" ... %d (%s)\n", _cmd.c_str(), res, errorname(res));
+	return res;
 }
 
 int Exec(const char * cmd, int flags)
 {
 	std::string _cmd("/bin/sh -c \'");
 	_cmd += cmd;
-	_cmd += "'";
-	LOG_INFO("Try exec \"%s\"\n", _cmd.c_str());
-	return system(_cmd.c_str());
+	_cmd += "\'";
+        int res = system(_cmd.c_str());
+	LOG_INFO("Exec \"%s\" ... %d (%s)\n", _cmd.c_str(), res, errorname(res));
+	return res;
 }
 
 int main(int argc, char * argv[])

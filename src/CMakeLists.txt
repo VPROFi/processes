@@ -64,7 +64,17 @@ set_target_properties(${PROJECT_NAME}
         PREFIX ""
         SUFFIX ".far-plug-wide")
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/configs
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/configs "${INSTALL_DIR}/Plugins/${PROJECT_NAME}"
+set(CONFIG_STAMP "${CMAKE_CURRENT_BINARY_DIR}/configs_copied.stamp")
+
+add_custom_command(
+    OUTPUT ${CONFIG_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+            "${CMAKE_CURRENT_SOURCE_DIR}/configs" 
+            "${INSTALL_DIR}/Plugins/${PROJECT_NAME}"
+    COMMAND ${CMAKE_COMMAND} -E touch ${CONFIG_STAMP}
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/configs"
+    COMMENT "Copying language and help files..."
 )
+
+add_custom_target(copy_${PROJECT_NAME}_configs ALL DEPENDS ${CONFIG_STAMP})
+add_dependencies(${PROJECT_NAME} copy_${PROJECT_NAME}_configs)

@@ -15,7 +15,7 @@
 #include "errname.h"
 #include "log.h"
 
-#define LOG_SOURCE_FILE "fileutil.c"
+#define LOG_SOURCE_FILE "procutil.c"
 
 #ifdef MAIN_COMMON_PROCUTIL
 const char * LOG_FILE = "";
